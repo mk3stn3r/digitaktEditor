@@ -1,0 +1,14 @@
+Linux Mint / Ubuntu, from a clean machine:
+
+  sudo apt install build-essential cmake git \
+       libasound2-dev libx11-dev libxext-dev libxinerama-dev libxrandr-dev \
+       libxcursor-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev
+
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build -j$(nproc)
+  cd build && ctest --output-on-failure && cd ..
+
+  "build/DigitaktPatternEditor_artefacts/Release/Digitakt Pattern Editor"
+
+JUCE downloads automatically on the first configure (~200 MB). To use an
+existing checkout instead:  cmake -S . -B build -DJUCE_PATH=/path/to/JUCE
