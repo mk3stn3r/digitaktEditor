@@ -87,9 +87,18 @@ MainComponent::MainComponent()
             {
                 samplesPanel.setMidiOutput (midi.rawOutput());
                 requester.setOutput (midi.rawOutput());
+
+                // A background thread is what makes timestamped clock accurate.
+                if (auto* out = midi.rawOutput()) out->startBackgroundThread();
+                midiSink.output.store (midi.rawOutput());
+                remotePanel.setConnected (true, outputs[i].name);
             }
             else
+            {
+                midiSink.output.store (nullptr);
+                remotePanel.setConnected (false, {});
                 setStatus ("could not open " + outputs[i].name + " for output", true);
+            }
         }
     };
     inputPortBox.onChange = [this]
@@ -116,7 +125,10 @@ MainComponent::MainComponent()
     tabs.addTab ("Pattern", panelBg, &gridPage, false);
     tabs.addTab ("+Drive samples", panelBg, &samplesPanel, false);
     tabs.addTab ("Sample pool", panelBg, &poolPanel, false);
+    tabs.addTab ("Remote", panelBg, &remotePanel, false);
     poolPanel.setListener (this);
+    remotePanel.setListener (this);
+    engine.setMidiSink (&midiSink);
 
     // Open the default audio output. Failing is not fatal - everything except
     // local playback still works - so it is reported, not thrown.
@@ -150,8 +162,11 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
-    // Remove the callback before anything the audio thread touches goes away.
+    // Remove the callback before anything the audio thread touches goes away,
+    // and detach the sink before the port it points at is closed.
     if (audioReady) audioDevices.removeAudioCallback (&engine);
+    engine.setMidiSink (nullptr);
+    midiSink.output.store (nullptr);
     engine.stop();
     midi.setListener (nullptr);
     stopTimer();
@@ -219,10 +234,19 @@ dtk::ElkDump* MainComponent::activeDump()
     return &dumps[(size_t) activeDumpIndex];
 }
 
+const dtk::ElkDump* MainComponent::activeDumpConst() const
+{
+    if (activeDumpIndex < 0 || activeDumpIndex >= (int) dumps.size()) return nullptr;
+    return &dumps[(size_t) activeDumpIndex];
+}
+
 void MainComponent::markDirty()
 {
     dirty = true;
     saveButton.setButtonText ("Save *");
+
+    // Every edit restarts the countdown, so a burst of edits sends once.
+    if (autoSendArmed) autoSendCountdown = autoSendTicks;
 }
 
 void MainComponent::setStatus (const juce::String& text, bool isError)
@@ -358,6 +382,9 @@ void MainComponent::timerCallback()
         grid.setPlayhead (-1);
     }
 
+    if (autoSendArmed && autoSendCountdown > 0 && --autoSendCountdown == 0)
+        autoSendNow();
+
     if (--portScanCountdown <= 0)
     {
         portScanCountdown = portScanTicks;
@@ -400,6 +427,76 @@ void MainComponent::poolChanged()
 {
     refreshEngine();
     grid.repaint();
+}
+
+//==============================================================================
+void MainComponent::remoteConfigChanged (SequencerEngine::RemoteConfig c)
+{
+    engine.setRemoteConfig (c);
+    if (c.enabled)
+        setStatus ("Driving the Digitakt: clock and trigs go out on channels "
+                   + juce::String (c.firstTrackChannel) + "-"
+                   + juce::String (juce::jmin (16, c.firstTrackChannel + 7))
+                   + ". Edits are audible on the next pass.");
+}
+
+void MainComponent::localAudioChanged (bool enabled)
+{
+    engine.setLocalAudioEnabled (enabled);
+}
+
+void MainComponent::autoSendChanged (bool enabled)
+{
+    autoSendArmed = enabled;
+    autoSendCountdown = 0;
+
+    if (! enabled) { setStatus ("Auto-send off."); return; }
+
+    const auto* d = const_cast<const MainComponent*> (this)->activeDumpConst();
+    setStatus ("Auto-send armed - the pattern will be uploaded to slot "
+               + juce::String (d != nullptr ? d->index : 0)
+               + " two seconds after each edit.");
+}
+
+/** Uploads the current pattern to its slot. Used by the auto-send debounce. */
+void MainComponent::autoSendNow()
+{
+    auto* d = activeDump();
+    if (d == nullptr || ! midi.outputOpen()) return;
+
+    d->refreshContent();
+    juce::String error;
+    if (midi.send (*d, error))
+        setStatus ("Auto-sent to slot " + juce::String (d->index)
+                   + " - the Digitakt must be at WAITING DATA to accept it.");
+    else
+        setStatus ("Auto-send failed: " + error, true);
+}
+
+void MainComponent::sendProgramChange (int patternSlot)
+{
+    auto* out = midi.rawOutput();
+    if (out == nullptr) { setStatus ("No MIDI output is open.", true); return; }
+
+    const auto cfg = engine.remoteConfig();
+    // Program change goes on the instrument's PROGRAM CH IN channel, which
+    // defaults to the auto channel; the track base is the best guess we have.
+    const int channel = juce::jlimit (1, 16, cfg.firstTrackChannel);
+    out->sendMessageNow (juce::MidiMessage::programChange (channel, patternSlot - 1));
+
+    setStatus ("Sent program change " + juce::String (patternSlot - 1)
+               + " (pattern " + juce::String (patternSlot) + ") on channel "
+               + juce::String (channel)
+               + " - the Digitakt queues it until the current pattern ends.");
+}
+
+void MainComponent::sendControlChange (int channel, int cc, int value)
+{
+    auto* out = midi.rawOutput();
+    if (out == nullptr) { setStatus ("No MIDI output is open.", true); return; }
+    out->sendMessageNow (juce::MidiMessage::controllerEvent (channel, cc, value));
+    setStatus ("Sent CC " + juce::String (cc) + " = " + juce::String (value)
+               + " on channel " + juce::String (channel));
 }
 
 void MainComponent::togglePlay()
@@ -740,7 +837,7 @@ void MainComponent::assignSampleToSlot (const dtk::api::DirEntry& entry, int slo
             "pattern dump.\n\nTo assign samples to slots, receive a whole "
             "project from the Digitakt (SYSEX DUMP > SYSEX SEND > WHOLE PROJECT) "
             "so the project settings come along too.\n\n"
-            "You can still sequence sample slot " + juce::String (slot + 1)
+            "You can still sequence sample slot " + juce::String (slot)
             + " from the Pattern tab with the s and S keys - the slot number is "
               "all a pattern needs.");
         return;
@@ -751,7 +848,7 @@ void MainComponent::assignSampleToSlot (const dtk::api::DirEntry& entry, int slo
     settings->samples[(size_t) slot] = dtk::Sample::fromDriveFile (entry.hash, entry.size);
     for (auto& d : dumps) if (d.projectSettings.has_value()) d.refreshContent();
     markDirty();
-    setStatus ("slot " + juce::String (slot + 1) + " now points at "
+    setStatus ("slot " + juce::String (slot) + " now points at "
                + juce::String (entry.name));
 }
 

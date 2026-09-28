@@ -13,6 +13,8 @@ can write offline and send the result to the machine later.
 
 ![the local sample pool](docs/screenshot-pool.png)
 
+![remote control](docs/screenshot-remote.png)
+
 Built for **Digitakt I on Linux**, but nothing here is Linux-specific — the
 same CMake project builds on macOS and Windows.
 
@@ -31,6 +33,47 @@ same CMake project builds on macOS and Windows.
 - **Sample sequencer** - a different +Drive sample on every step of a track.
 - **Offline playback** - a local 128-slot sample pool and an audio engine, so
   the app is a usable sample sequencer on its own.
+- **Remote control** - drive the instrument from the editor's transport: MIDI
+  clock, start/stop, and trigs as notes on the per-track channels.
+
+---
+
+## Remote control
+
+There is no protocol for live-editing a pattern that is already running on the
+Digitakt - dumps move whole patterns, not single trigs. So live editing is
+solved the other way round: **the editor becomes the master clock and plays the
+instrument's own samples over MIDI**. Toggle a trig in the grid and the Digitakt
+plays it on the next pass. Nothing is uploaded and no slot is overwritten.
+
+The **Remote** tab keeps three things apart, because they carry very different
+risk:
+
+| | What it does | Writes to the machine? |
+|---|---|---|
+| **Drive** | clock, start/stop, trigs as notes on the track channels | no |
+| **Follow** | a program change when the pattern slot changes | no |
+| **Auto-send** | uploads the edited pattern to its slot after you stop typing | **yes, overwrites it** |
+
+Auto-send is off by default and asks once before it is armed, because after
+that it overwrites that slot on every edit with no further prompting. Point the
+Slot field at a scratch pattern first. For live work, Drive is the better tool
+anyway - the instrument stores what it receives, but a pattern that is already
+playing may not pick up an uploaded change until you reselect it.
+
+**On the Digitakt:** `SETTINGS > MIDI CONFIG > SYNC` - turn on CLOCK RECEIVE and
+TRANSPORT RECEIVE, plus PROG CH RECEIVE for pattern changes. In
+`MIDI CONFIG > CHANNELS` set TRACK 1-8 to consecutive channels starting at the
+one set in the panel. The machine will not run from an external transport
+without clock, so turning clock off makes start and stop do nothing.
+
+Program changes 0-127 select patterns 1-128. The instrument **queues** the
+change until the current pattern ends, so send it a bar early.
+
+**No CC parameter map is shipped.** Published CC tables for the Digitakt II do
+not necessarily hold for the Digitakt I, and a map that looks authoritative but
+is wrong is worse than none. The CC sender is deliberately raw - channel,
+number, value - so check your model's manual for the number you want.
 
 ---
 
@@ -253,6 +296,9 @@ device, dump again, compare.
 | +Drive API: dir ops, file transfer | **Certain** | Port of elk-herd's message definitions |
 | Sample slot p-locks | **Certain** | elk-herd decodes these; encoding is the inverse |
 | Dump request messages | **Certain** | Byte-exact against elk-herd's builder and the Python port |
+| Program change 0-127 = pattern 1-128 | **Certain** | Digitakt manual |
+| Per-track MIDI channels, clock required | **Certain** | Digitakt manual |
+| Digitakt I CC numbers | **Not shipped** | Published tables cover the DT II; the CC sender is raw |
 | Slot numbering (1-based, 0 = none) | **High** | Matches elk-herd's default-kit check; affects local playback only |
 | +Drive sample file format | **Certain** | Port of elk-herd's `prepSamples` |
 
@@ -280,17 +326,22 @@ Source/DumpRequester.h/.cpp   requests patterns and whole projects
 Source/SamplePool.h/.cpp      128 local slots, lock-free for the audio thread
 Source/SequencerEngine.h/.cpp the offline sequencer and voices
 Source/PoolPanel.h/.cpp       the sample pool tab
+Source/RemotePanel.h/.cpp     remote control settings
 
 Tests/TestCore.cpp           37 checks - format, round-trip, sample locks, requests
 Tests/TestApi.cpp            53 checks - protocol, transfers and decoding vs a mock
 Tests/TestSampleImport.cpp   15 checks - downmix, resample, header
-Tests/TestEngine.cpp         18 checks - step timing, voices, gating, locks
+Tests/TestEngine.cpp         44 checks - step timing, voices, gating, locks,
+                                         clock, transport and note output
 ```
 
-123 checks in total, `ctest --output-on-failure` runs all four. The engine
-tests drive the audio callback directly with scratch buffers, so timing and
-voice behaviour are verified without a sound card: four-on-the-floor lands
-within two samples of each beat, and stays there at odd block sizes.
+149 checks in total, `ctest --output-on-failure` runs all four. The engine
+tests drive the audio callback directly with scratch buffers and capture the
+generated MIDI through a stub sink, so both halves are verified without a sound
+card or an instrument: four-on-the-floor lands within two samples of each beat
+and stays there at odd block sizes, one bar produces exactly 96 MIDI clocks
+with under half a millisecond of jitter, and every note that goes out comes
+back off - including when a retrig lands on a track that is still holding one.
 
 The Python package still ships alongside this for scripting and batch work —
 its `--map` option for custom MIDI channel routing has no GUI equivalent yet.

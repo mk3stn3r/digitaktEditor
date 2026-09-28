@@ -165,7 +165,7 @@ void SamplesPanel::listBoxItemDoubleClicked (int row, const juce::MouseEvent&)
         "point at this file?\n\nSlots are matched by content, not path, so this "
         "survives moving the file on the +Drive.",
         juce::MessageBoxIconType::QuestionIcon);
-    aw->addTextEditor ("slot", "1", "Slot (1-128):");
+    aw->addTextEditor ("slot", "1", "Slot (1-127):");
     aw->addButton ("Assign", 1);
     aw->addButton ("Cancel", 0);
 
@@ -175,8 +175,8 @@ void SamplesPanel::listBoxItemDoubleClicked (int row, const juce::MouseEvent&)
         {
             const int slot = aw->getTextEditorContents ("slot").getIntValue();
             std::unique_ptr<juce::AlertWindow> owner (aw);
-            if (result == 1 && slot >= 1 && slot <= 128 && listener != nullptr)
-                listener->assignSampleToSlot (entry, slot - 1);
+            if (result == 1 && slot >= 1 && slot <= 127 && listener != nullptr)
+                listener->assignSampleToSlot (entry, slot);
         }), false);
 }
 

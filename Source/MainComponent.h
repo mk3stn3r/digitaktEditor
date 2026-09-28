@@ -13,6 +13,7 @@
 
 #include "DumpRequester.h"
 #include "PoolPanel.h"
+#include "RemotePanel.h"
 #include "SamplePool.h"
 #include "SequencerEngine.h"
 #include "SamplesPanel.h"
@@ -23,6 +24,7 @@ class MainComponent : public juce::Component,
                       private SamplesPanel::Listener,
                       private DumpRequester::Listener,
                       private PoolPanel::Listener,
+                      private RemotePanel::Listener,
                       private juce::Timer
 {
 public:
@@ -66,6 +68,12 @@ private:
     void dumpsFailed (const juce::String& why) override;
 
     void poolChanged() override;
+
+    void remoteConfigChanged (SequencerEngine::RemoteConfig) override;
+    void autoSendChanged (bool) override;
+    void sendProgramChange (int patternSlot) override;
+    void sendControlChange (int channel, int cc, int value) override;
+    void localAudioChanged (bool) override;
     void refreshEngine();
 
     void timerCallback() override;
@@ -79,6 +87,8 @@ private:
     void setStatus (const juce::String&, bool isError = false);
     void markDirty();
     dtk::ElkDump* activeDump();
+    const dtk::ElkDump* activeDumpConst() const;
+    void autoSendNow();
 
     //== state ================================================================
     std::vector<dtk::ElkDump> dumps;
@@ -100,6 +110,25 @@ private:
 
     static constexpr int portScanTicks = 60;   // ~2 s at a 33 ms tick
     int portScanCountdown = 1;
+
+    /** Feeds the engine's generated MIDI to the open output port. */
+    struct OutputSink : MidiSink
+    {
+        std::atomic<juce::MidiOutput*> output { nullptr };
+        void sendBlock (const juce::MidiBuffer& buffer, double sampleRate) override
+        {
+            if (auto* o = output.load())
+                o->sendBlockOfMessages (buffer,
+                                        juce::Time::getMillisecondCounterHiRes() + 1.0,
+                                        sampleRate);
+        }
+    };
+    OutputSink midiSink;
+
+    // Auto-send debounce: upload only once the user stops editing.
+    static constexpr int autoSendTicks = 60;   // ~2 s
+    bool autoSendArmed = false;
+    int  autoSendCountdown = 0;
 
     //== widgets ==============================================================
     juce::TextButton newButton     { "New" };
@@ -131,6 +160,7 @@ private:
     juce::Component gridPage;
     SamplesPanel samplesPanel;
     PoolPanel poolPanel { pool, engine };
+    RemotePanel remotePanel;
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
 
     juce::Label inspectorLabel;

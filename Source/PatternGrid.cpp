@@ -270,8 +270,8 @@ bool PatternGrid::keyPressed (const juce::KeyPress& key)
             // Sample lock: cycle the slot, wrapping past the pool size.
             const auto cur = editor->sampleLock (selectedTrack, selectedStep);
             const int delta = (ch == 'S') ? 1 : -1;
-            int next = cur.has_value() ? *cur + delta : (delta > 0 ? 1 : 128);
-            if (next < 1 || next > 128)
+            int next = cur.has_value() ? *cur + delta : (delta > 0 ? 1 : 127);
+            if (next < 1 || next > 127)
             {
                 editor->setSampleLock (selectedTrack, selectedStep, std::nullopt);
             }

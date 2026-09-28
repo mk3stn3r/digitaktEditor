@@ -27,7 +27,7 @@ public:
     void setListener (Listener* l) { listener = l; }
 
     /** Highlights the slots the loaded pattern actually uses. */
-    void setSlotsInUse (const std::vector<int>& instrumentSlots);
+    void setSlotsInUse (const std::vector<int>& slotNumbers);
 
     void paint (juce::Graphics&) override;
     void resized() override;

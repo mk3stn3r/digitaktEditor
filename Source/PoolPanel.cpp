@@ -27,7 +27,7 @@ PoolPanel::PoolPanel (SamplePool& p, SequencerEngine& e) : pool (p), engine (e)
     add (auditionButton, [this]
     {
         const int row = list.getSelectedRow();
-        if (row >= 0) engine.triggerAudition (SamplePool::instrumentSlot (row));
+        if (row >= 0) engine.triggerAudition (row);
     });
 
     addAndMakeVisible (header);
@@ -52,7 +52,8 @@ void PoolPanel::setSlotsInUse (const std::vector<int>& used)
 void PoolPanel::refresh()
 {
     header.setText ("Local sample pool - " + juce::String (pool.numLoaded())
-                    + " of 128 slots loaded", juce::dontSendNotification);
+                    + " of 127 slots loaded (slot 0 is 'off')",
+                    juce::dontSendNotification);
     list.updateContent();
     list.repaint();
 }
@@ -82,8 +83,8 @@ void PoolPanel::paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool
 {
     if (row < 0 || row >= SamplePool::numSlots) return;
 
-    const bool inUse = std::find (slotsInUse.begin(), slotsInUse.end(),
-                                  SamplePool::instrumentSlot (row)) != slotsInUse.end();
+    const bool inUse = std::find (slotsInUse.begin(), slotsInUse.end(), row)
+                           != slotsInUse.end();
 
     g.fillAll (selected ? rowAlt.brighter (0.25f)
                         : (row == dropRow ? dropColour.withAlpha (0.2f)
@@ -91,10 +92,21 @@ void PoolPanel::paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool
 
     const auto& s = pool.slot (row);
 
+    // Slot 0 is the instrument's "off" entry, not a place to put a sample.
+    if (row == 0)
+    {
+        g.setColour (textDim.withAlpha (0.6f));
+        g.setFont (juce::FontOptions (11.0f));
+        g.drawText ("0", 6, 0, 34, h, juce::Justification::centredRight);
+        g.setFont (juce::FontOptions (12.0f, juce::Font::italic));
+        g.drawText ("off - no sample", 48, 0, w - 130, h,
+                    juce::Justification::centredLeft);
+        return;
+    }
+
     g.setColour (inUse ? usedColour : textDim);
     g.setFont (juce::FontOptions (11.0f, inUse ? juce::Font::bold : juce::Font::plain));
-    g.drawText (juce::String (SamplePool::instrumentSlot (row)),
-                6, 0, 34, h, juce::Justification::centredRight);
+    g.drawText (juce::String (row), 6, 0, 34, h, juce::Justification::centredRight);
 
     g.setColour (s.empty() ? textDim.withAlpha (0.5f) : textCol);
     g.setFont (juce::FontOptions (12.5f));
@@ -115,7 +127,7 @@ void PoolPanel::listBoxItemClicked (int, const juce::MouseEvent&) {}
 void PoolPanel::listBoxItemDoubleClicked (int row, const juce::MouseEvent&)
 {
     if (row < 0 || pool.slot (row).empty()) return;
-    engine.triggerAudition (SamplePool::instrumentSlot (row));
+    engine.triggerAudition (row);
 }
 
 //==============================================================================
@@ -155,29 +167,29 @@ void PoolPanel::filesDropped (const juce::StringArray& files, int x, int y)
     int row = list.getRowContainingPosition (local.x, local.y);
     dropRow = -1;
 
-    // Dropping past the end fills from the first free slot rather than failing.
-    if (row < 0)
+    // Dropping past the end, or onto the "off" row, starts at the first free
+    // usable slot rather than failing or overwriting something.
+    if (row < SamplePool::firstUsableSlot)
     {
-        row = 0;
-        while (row < SamplePool::numSlots && ! pool.slot (row).empty()) ++row;
-        if (row >= SamplePool::numSlots) row = 0;
+        row = pool.firstFreeSlot();
+        if (row < 0) row = SamplePool::firstUsableSlot;
     }
     loadFiles (files, row);
 }
 
 void PoolPanel::loadFiles (const juce::StringArray& paths, int firstSlot)
 {
-    int slot = firstSlot;
+    int slot = juce::jmax (SamplePool::firstUsableSlot, firstSlot);
     int loaded = 0;
     juce::StringArray problems;
 
     for (const auto& p : paths)
     {
-        while (slot < SamplePool::numSlots && ! pool.slot (slot).empty()
+        while (slot <= SamplePool::lastUsableSlot && ! pool.slot (slot).empty()
                && paths.size() > 1)
             ++slot;                        // a multi-file drop fills free slots
 
-        if (slot >= SamplePool::numSlots)
+        if (slot > SamplePool::lastUsableSlot)
         {
             problems.add ("ran out of free slots");
             break;
@@ -201,10 +213,10 @@ void PoolPanel::loadFiles (const juce::StringArray& paths, int firstSlot)
 
 void PoolPanel::loadIntoSelected()
 {
-    const int row = juce::jmax (0, list.getSelectedRow());
+    const int row = juce::jmax (SamplePool::firstUsableSlot, list.getSelectedRow());
 
     chooser = std::make_unique<juce::FileChooser> (
-        "Load audio into slot " + juce::String (SamplePool::instrumentSlot (row)),
+        "Load audio into slot " + juce::String (row),
         juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
 
     chooser->launchAsync (juce::FileBrowserComponent::openMode

@@ -4,6 +4,12 @@ project(DigitaktPatternEditor VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Link-time optimisation is off by default. It needs well over 2 GB to link
+# this app, and on a small machine GCC dies with an internal compiler error in
+# lto-wrapper rather than a clean out-of-memory message - which is a miserable
+# thing to debug. Turn it on with -DDTK_ENABLE_LTO=ON if you have the headroom.
+option(DTK_ENABLE_LTO "Build with link-time optimisation (needs plenty of RAM)" OFF)
+
 # Point at an existing JUCE checkout with -DJUCE_PATH=/path/to/JUCE,
 # otherwise it is fetched automatically (~200 MB, one time).
 if(DEFINED JUCE_PATH)
@@ -38,6 +44,7 @@ target_sources(DigitaktPatternEditor PRIVATE
     Source/SamplePool.cpp
     Source/SequencerEngine.cpp
     Source/PoolPanel.cpp
+    Source/RemotePanel.cpp
     Source/BlankData.cpp)
 
 target_compile_definitions(DigitaktPatternEditor PRIVATE
@@ -54,8 +61,11 @@ target_link_libraries(DigitaktPatternEditor PRIVATE
     juce::juce_audio_utils
     PUBLIC
     juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+if(DTK_ENABLE_LTO)
+    target_link_libraries(DigitaktPatternEditor PUBLIC juce::juce_recommended_lto_flags)
+endif()
 
 # The core has no JUCE dependency, so it can be tested on its own. This is
 # what proves byte-exact agreement with the Python implementation.

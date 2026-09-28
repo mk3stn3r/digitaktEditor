@@ -51,19 +51,90 @@ void SequencerEngine::start()
 {
     stepIndex.store (0);
     samplesUntilNextStep = 0.0;
+    samplesUntilNextClock = 0.0;
+    pendingStart.store (true);
     playing.store (true);
 }
 
 void SequencerEngine::stop()
 {
     playing.store (false);
+    pendingStop.store (true);
 }
 
-void SequencerEngine::triggerAudition (int instrumentSlot, int note, float velocity)
+void SequencerEngine::setMidiSink (MidiSink* s)
+{
+    const juce::SpinLock::ScopedLockType sl (remoteLock);
+    sink = s;
+}
+
+void SequencerEngine::setRemoteConfig (RemoteConfig c)
+{
+    c.firstTrackChannel = juce::jlimit (1, 16, c.firstTrackChannel);
+    const juce::SpinLock::ScopedLockType sl (remoteLock);
+    remote = c;
+}
+
+SequencerEngine::RemoteConfig SequencerEngine::remoteConfig() const
+{
+    const juce::SpinLock::ScopedLockType sl (remoteLock);
+    return remote;
+}
+
+SequencerEngine::RemoteConfig SequencerEngine::currentRemote() const
+{
+    // The audio thread must not wait on the message thread; a missed update
+    // costs one block of stale settings, which is inaudible.
+    const juce::SpinLock::ScopedTryLockType sl (remoteLock);
+    if (! sl.isLocked()) return RemoteConfig {};
+    return remote;
+}
+
+void SequencerEngine::emitNoteOn (int track, const StepData& d,
+                                  double samplesPerStep, int offset)
+{
+    const auto cfg = currentRemote();
+    if (! cfg.enabled || ! cfg.sendNotes) return;
+
+    const int channel = cfg.firstTrackChannel + track;
+    if (channel > 16) return;              // track would fall off the end
+
+    // Each Digitakt track is monophonic, so a retrig must release the last
+    // note or the instrument is left holding it.
+    if (activeMidiNote[track] >= 0) emitNoteOff (track, offset);
+
+    const int note = juce::jlimit (0, 127, d.note);
+    const auto vel = (juce::uint8) juce::jlimit (1, 127, d.velocity);
+    midiOut.addEvent (juce::MidiMessage::noteOn (channel, note, vel), offset);
+
+    activeMidiNote[track] = note;
+    midiGateLeft[track] = d.length > 0 ? d.length * samplesPerStep : samplesPerStep;
+}
+
+void SequencerEngine::emitNoteOff (int track, int offset)
+{
+    if (activeMidiNote[track] < 0) return;
+
+    const auto cfg = currentRemote();
+    const int channel = cfg.firstTrackChannel + track;
+    if (channel <= 16)
+        midiOut.addEvent (juce::MidiMessage::noteOff (channel, activeMidiNote[track]),
+                          offset);
+
+    activeMidiNote[track] = -1;
+    midiGateLeft[track] = -1.0;
+}
+
+void SequencerEngine::allNotesOff (int offset)
+{
+    for (int t = 0; t < numAudioTracks; ++t) emitNoteOff (t, offset);
+}
+
+void SequencerEngine::triggerAudition (int slot, int note, float velocity)
 {
     auditionNote.store (note);
     auditionVelocity.store (velocity);
-    auditionSlot.store (instrumentSlot);   // picked up by the audio thread
+    auditionSlot.store (slot);             // picked up by the audio thread
 }
 
 void SequencerEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
@@ -71,13 +142,20 @@ void SequencerEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     sampleRate = device != nullptr ? device->getCurrentSampleRate() : 48000.0;
     if (sampleRate <= 0.0) sampleRate = 48000.0;
     samplesUntilNextStep = 0.0;
+    samplesUntilNextClock = 0.0;
     for (auto& v : voices) v.reset();
     auditionVoice.reset();
+    for (int t = 0; t < numAudioTracks; ++t)
+    {
+        activeMidiNote[t] = -1;
+        midiGateLeft[t] = -1.0;
+    }
 }
 
 void SequencerEngine::audioDeviceStopped()
 {
     playing.store (false);
+    pendingStop.store (true);
     for (auto& v : voices) v.reset();
     auditionVoice.reset();
 }
@@ -95,7 +173,7 @@ void SequencerEngine::startVoice (Voice& v, const SamplePool::Audio& audio,
     v.active = true;
 }
 
-void SequencerEngine::fireStep (int step)
+void SequencerEngine::fireStep (int step, int sampleOffset)
 {
     const auto& s = snapshots[liveSnapshot.load()];
     const double samplesPerStep = sampleRate * 60.0 / juce::jmax (30.0, s.tempo) / 4.0;
@@ -103,9 +181,15 @@ void SequencerEngine::fireStep (int step)
     for (int t = 0; t < numAudioTracks; ++t)
     {
         const auto& d = s.steps[t][step];
-        if (! d.trig || d.slot <= 0) continue;
+        if (! d.trig) continue;
 
-        auto audio = pool.audioForInstrumentSlot (d.slot);
+        // The instrument plays its own sample for the track, so a trig is
+        // worth sending even when the local pool has nothing in that slot.
+        emitNoteOn (t, d, samplesPerStep, sampleOffset);
+
+        if (d.slot <= 0 || ! localAudio.load()) continue;
+
+        auto audio = pool.audioForSlot (d.slot);
         if (audio == nullptr) continue;      // slot is empty locally
 
         const double gate = d.length > 0 ? d.length * samplesPerStep : -1.0;
@@ -114,18 +198,23 @@ void SequencerEngine::fireStep (int step)
     }
 }
 
-void SequencerEngine::advanceStep()
+void SequencerEngine::advanceStep (int sampleOffset)
 {
     const auto& s = snapshots[liveSnapshot.load()];
     int next = stepIndex.load() + 1;
 
     if (next >= s.length)
     {
-        if (! looping.load()) { playing.store (false); return; }
+        if (! looping.load())
+        {
+            playing.store (false);
+            pendingStop.store (true);
+            return;
+        }
         next = 0;
     }
     stepIndex.store (next);
-    fireStep (next);
+    fireStep (next, sampleOffset);
 }
 
 void SequencerEngine::audioDeviceIOCallbackWithContext (
@@ -140,13 +229,30 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
     // Pick up an audition request without blocking the message thread.
     const int audition = auditionSlot.exchange (-1);
     if (audition > 0)
-        if (auto audio = pool.audioForInstrumentSlot (audition))
+        if (auto audio = pool.audioForSlot (audition))
             startVoice (auditionVoice, audio, auditionNote.load(),
                         auditionVelocity.load(), -1.0);
 
     const auto& snap = snapshots[liveSnapshot.load()];
     const double samplesPerStep =
         sampleRate * 60.0 / juce::jmax (30.0, snap.tempo) / 4.0;
+    // 24 pulses per quarter note is the MIDI clock rate, so six per sixteenth.
+    const double samplesPerClock = samplesPerStep / 6.0;
+
+    const auto cfg = currentRemote();
+    midiOut.clear();
+
+    if (pendingStart.exchange (false) && cfg.enabled && cfg.sendTransport)
+    {
+        midiOut.addEvent (juce::MidiMessage::midiStart(), 0);
+        samplesUntilNextClock = 0.0;
+    }
+    if (pendingStop.exchange (false))
+    {
+        allNotesOff (0);
+        if (cfg.enabled && cfg.sendTransport)
+            midiOut.addEvent (juce::MidiMessage::midiStop(), 0);
+    }
 
     const float masterGain = gain.load();
     int offset = 0;
@@ -161,7 +267,7 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
             {
                 // The very first step of a run fires here rather than in
                 // start(), so it lands on a buffer boundary with a valid rate.
-                fireStep (stepIndex.load());
+                fireStep (stepIndex.load(), offset);
                 samplesUntilNextStep = samplesPerStep;
             }
             block = juce::jmin (block, (int) std::ceil (samplesUntilNextStep));
@@ -204,15 +310,47 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
         for (auto& v : voices) renderVoice (v);
         renderVoice (auditionVoice);
 
+        // MIDI clock runs on its own subdivision of the step grid.
+        if (playing.load() && cfg.enabled && cfg.sendClock)
+        {
+            double remaining = (double) block;
+            double at = (double) offset;
+            while (samplesUntilNextClock <= remaining)
+            {
+                at += samplesUntilNextClock;
+                remaining -= samplesUntilNextClock;
+                midiOut.addEvent (juce::MidiMessage::midiClock(),
+                                  juce::jlimit (0, numSamples - 1, (int) at));
+                samplesUntilNextClock = samplesPerClock;
+            }
+            samplesUntilNextClock -= remaining;
+        }
+
+        // Release remote notes whose gate has run out.
+        for (int t = 0; t < numAudioTracks; ++t)
+        {
+            if (activeMidiNote[t] < 0 || midiGateLeft[t] < 0.0) continue;
+            midiGateLeft[t] -= (double) block;
+            if (midiGateLeft[t] <= 0.0)
+                emitNoteOff (t, juce::jmin (numSamples - 1, offset + block - 1));
+        }
+
         if (playing.load())
         {
             samplesUntilNextStep -= (double) block;
             if (samplesUntilNextStep <= 0.0)
             {
-                advanceStep();
+                advanceStep (juce::jmin (numSamples - 1, offset + block));
                 samplesUntilNextStep += samplesPerStep;
             }
         }
         offset += block;
+    }
+
+    if (! midiOut.isEmpty())
+    {
+        const juce::SpinLock::ScopedTryLockType sl (remoteLock);
+        if (sl.isLocked() && sink != nullptr)
+            sink->sendBlock (midiOut, sampleRate);
     }
 }
