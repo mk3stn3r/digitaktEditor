@@ -24,6 +24,9 @@ public:
     {
         virtual ~Listener() = default;
         virtual void apiDeviceIdentified (int productId, const juce::String& name) {}
+        /** Build string ("0095") and OS string ("1.52") from the device. */
+        virtual void apiVersionIdentified (const juce::String& build,
+                                           const juce::String& osVersion) {}
         virtual void apiDriveListed (const juce::String& path,
                                      const std::vector<dtk::api::DirEntry>&) {}
         virtual void apiUploadProgress (const juce::String& name, double fraction,
@@ -51,6 +54,7 @@ public:
 
     //== operations ===========================================================
     void identifyDevice();
+    void requestVersion();
     void listDirectory (const juce::String& path);
     void createDirectory (const juce::String& path);
     void deleteFile (const juce::String& path);
@@ -70,7 +74,7 @@ public:
     static constexpr int timeoutMs = 6000;
 
 private:
-    enum class Op { none, identify, list, mkdir, del, upload, download };
+    enum class Op { none, identify, version, list, mkdir, del, upload, download };
 
     void timerCallback() override;
     void sendRaw (const dtk::Bytes& sysex);

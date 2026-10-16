@@ -447,6 +447,34 @@ PatternKit       blankPatternKit (int storageVersion = 9);
 constexpr int latestDT1PatternVersion = 9;
 
 //==============================================================================
+/** Which storage structure versions a given instrument build writes.
+
+    Ported from elk-herd's `digitaktVersions` table. The lookup is by *build*
+    string ("0095"), not the human-readable OS version ("1.52"), because the
+    build is a zero-padded number that compares correctly and the version
+    string's format is not guaranteed.
+
+    A device can load older structures but always writes these, so this is what
+    decides which blank to start from when making a new pattern. */
+struct StorageVersions
+{
+    int projectSettings { 0 };
+    int patternAndKit { 0 };
+};
+
+/** The last table entry not exceeding `build`, or nullopt if the build is
+    older than anything known. A build newer than the table returns the newest
+    entry - see `buildIsNewerThanKnown`. */
+std::optional<StorageVersions> storageVersionsForBuild (Device, const std::string& build);
+
+/** True when the instrument is newer than this table knows about, in which
+    case the versions returned are a best guess rather than a fact. */
+bool buildIsNewerThanKnown (Device, const std::string& build);
+
+/** The human-readable OS version for a known build, e.g. "0095" -> "1.52". */
+std::string osVersionForBuild (Device, const std::string& build);
+
+//==============================================================================
 /** Editing helpers. All of these leave untouched bytes untouched. */
 struct Step
 {

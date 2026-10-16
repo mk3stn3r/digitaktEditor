@@ -7,6 +7,7 @@
 
 #include "SequencerEngine.h"
 #include "SamplePool.h"
+#include "PluginRack.h"
 #include "DigitaktCore.h"
 
 #include <cmath>
@@ -133,7 +134,8 @@ int main()
     // --- silence when nothing is loaded -------------------------------------
     {
         SamplePool pool;
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -153,7 +155,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 2000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -178,7 +181,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 1000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -207,7 +211,7 @@ int main()
         check (timingOk, "four-on-the-floor lands within 2 samples of each beat");
 
         // Using an odd block size must not shift the grid.
-        SequencerEngine e2 (pool);
+        SequencerEngine e2 (pool, rack);
         e2.audioDeviceAboutToStart (nullptr);
         e2.setGain (1.0f);
         e2.updateFromPattern (pk);
@@ -223,7 +227,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 1.0f, 48000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -247,7 +252,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 48000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -271,7 +277,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 48000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -296,7 +303,8 @@ int main()
         loadFlat (pool, 5, 0.25f, 1000);    // the track's kit sample
         loadFlat (pool, 9, 0.75f, 1000);    // the locked sample
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -325,7 +333,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 500);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -360,7 +369,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 1000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -381,7 +391,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 1, 0.5f, 1000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -403,7 +414,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 7, 0.6f, 2000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -419,7 +431,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 1000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         engine.audioDeviceAboutToStart (nullptr);
         engine.setGain (1.0f);
 
@@ -446,7 +459,8 @@ int main()
     // --- remote control: clock, transport and notes --------------------------
     {
         SamplePool pool;
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -521,7 +535,8 @@ int main()
     // --- remote off means silence on the wire --------------------------------
     {
         SamplePool pool;
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -542,7 +557,8 @@ int main()
     // --- the channel base shifts every track ---------------------------------
     {
         SamplePool pool;
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -576,7 +592,8 @@ int main()
     // --- a retrig releases the previous note ---------------------------------
     {
         SamplePool pool;
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -609,7 +626,8 @@ int main()
     // --- stopping releases everything ----------------------------------------
     {
         SamplePool pool;
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -641,7 +659,8 @@ int main()
         SamplePool pool;
         loadFlat (pool, 5, 0.5f, 2000);
 
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -670,7 +689,8 @@ int main()
     // --- a trig with no local sample still drives the instrument -------------
     {
         SamplePool pool;                     // deliberately empty
-        SequencerEngine engine (pool);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
         CapturingSink sink;
         engine.setMidiSink (&sink);
         engine.audioDeviceAboutToStart (nullptr);
@@ -690,6 +710,221 @@ int main()
 
         check (sink.count (isNoteOn) == 1,
                "an empty local pool does not stop the instrument being played");
+    }
+
+    // --- MIDI tracks drive the plugin rack -----------------------------------
+    {
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+
+        auto pk = dtk::blankPatternKit (9);
+        dtk::PatternEditor ed (pk);
+        ed.setLength (16);
+        ed.setTempo (120.0);
+        ed.setTrig (8, 0, true);            // M1
+        ed.setNote (8, 0, 64);
+        ed.setVelocity (8, 0, 90);
+        ed.setTrig (10, 0, true);           // M3
+        ed.setNote (10, 0, 55);
+        engine.updateFromPattern (pk);
+        engine.start();
+
+        // One block only, so the queued MIDI is still the first step's.
+        render (engine, 256);
+
+        int m1Notes = 0, m3Notes = 0, otherSlots = 0;
+        int m1Note = -1, m1Vel = -1, m3Note = -1;
+        for (int slot = 0; slot < PluginRack::numSlots; ++slot)
+        {
+            for (const auto meta : rack.pendingMidi (slot))
+            {
+                const auto m = meta.getMessage();
+                if (! m.isNoteOn()) continue;
+                if (slot == 0) { ++m1Notes; m1Note = m.getNoteNumber(); m1Vel = m.getVelocity(); }
+                else if (slot == 2) { ++m3Notes; m3Note = m.getNoteNumber(); }
+                else ++otherSlots;
+            }
+        }
+
+        check (m1Notes == 1 && m3Notes == 1,
+               "a trig on a MIDI track reaches that track's instrument slot");
+        check (otherSlots == 0, "and no other slot receives it");
+        check (m1Note == 64 && m1Vel == 90,
+               "the note carries the step's pitch and velocity");
+        check (m3Note == 55, "MIDI track 3 maps to rack slot 3");
+    }
+
+    // --- audio tracks must not leak into the rack ----------------------------
+    {
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+
+        auto pk = dtk::blankPatternKit (9);
+        dtk::PatternEditor ed (pk);
+        ed.setLength (16);
+        for (int t = 0; t < 8; ++t) ed.setTrig (t, 0, true);
+        engine.updateFromPattern (pk);
+        engine.start();
+        render (engine, 256);
+
+        int total = 0;
+        for (int slot = 0; slot < PluginRack::numSlots; ++slot)
+            for (const auto meta : rack.pendingMidi (slot))
+                if (meta.getMessage().isNoteOn()) ++total;
+
+        check (total == 0, "audio-track trigs never reach the plugin rack");
+    }
+
+    // --- plugin notes are released ------------------------------------------
+    {
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+
+        auto pk = dtk::blankPatternKit (9);
+        dtk::PatternEditor ed (pk);
+        ed.setLength (16);
+        ed.setTempo (120.0);
+        ed.setTrig (8, 0, true);
+        engine.updateFromPattern (pk);
+        engine.start();
+
+        // Step through a whole step in small blocks, counting note-offs; the
+        // gate is one step when no length lock is set.
+        int offs = 0;
+        for (int i = 0; i < 20; ++i)
+        {
+            render (engine, 512);
+            for (const auto meta : rack.pendingMidi (0))
+                if (meta.getMessage().isNoteOff()) ++offs;
+        }
+        check (offs >= 1, "a plugin note is released when its gate ends");
+    }
+
+    // --- an empty rack is harmless -------------------------------------------
+    {
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+        engine.setGain (1.0f);
+
+        auto pk = dtk::blankPatternKit (9);
+        dtk::PatternEditor ed (pk);
+        ed.setLength (16);
+        for (int t = 8; t < 16; ++t) ed.setTrig (t, 0, true);
+        engine.updateFromPattern (pk);
+        engine.start();
+
+        const auto out = render (engine, stepSamples * 4);
+        check (peakBetween (out, 0, (int) out.size()) == 0.0f,
+               "MIDI trigs with no instrument loaded stay silent and do not crash");
+    }
+
+    // --- live MIDI in from the Digitakt drives the instruments ---------------
+    {
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+        engine.setExternalMidiInput (true, 9);      // M1 on channel 9
+
+        // Timestamps are what MidiMessageCollector schedules against.
+        const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        auto stamped = [&] (juce::MidiMessage m) { m.setTimeStamp (now); return m; };
+
+        engine.handleExternalMidi (stamped (juce::MidiMessage::noteOn (9, 60, (juce::uint8) 100)));
+        engine.handleExternalMidi (stamped (juce::MidiMessage::noteOn (11, 67, (juce::uint8) 80)));
+        engine.handleExternalMidi (stamped (juce::MidiMessage::controllerEvent (9, 74, 99)));
+        engine.handleExternalMidi (stamped (juce::MidiMessage::noteOn (1, 40, (juce::uint8) 100)));
+
+        render (engine, 2048);
+
+        check (engine.externalMessagesRouted (0) == 2,
+               "channel 9 reaches M1's slot, notes and CC alike");
+        check (engine.externalMessagesRouted (2) == 1,
+               "channel 11 reaches M3's slot");
+        check (engine.externalMessagesRouted (1) == 0, "and nothing else does");
+
+        // Channel 1 is an audio track on the Digitakt, outside the M1-M8 range.
+        int outOfRange = 0;
+        for (int s2 = 0; s2 < PluginRack::numSlots; ++s2)
+            outOfRange += engine.externalMessagesRouted (s2);
+        check (outOfRange == 3, "a channel below the base is ignored, not wrapped");
+    }
+
+    {
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+        engine.setExternalMidiInput (false, 9);
+
+        const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        auto m = juce::MidiMessage::noteOn (9, 60, (juce::uint8) 100);
+        m.setTimeStamp (now);
+        engine.handleExternalMidi (m);
+        render (engine, 2048);
+
+        check (engine.externalMessagesRouted (0) == 0,
+               "with live input off, nothing is routed");
+    }
+
+    {
+        // The channel base is configurable because the Digitakt's MIDI track
+        // channels are set per track on the machine.
+        SamplePool pool;
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+        engine.setExternalMidiInput (true, 1);
+
+        const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        auto m = juce::MidiMessage::noteOn (8, 60, (juce::uint8) 100);
+        m.setTimeStamp (now);
+        engine.handleExternalMidi (m);
+        render (engine, 2048);
+
+        check (engine.externalMessagesRouted (7) == 1,
+               "with base channel 1, channel 8 lands on M8");
+    }
+
+    // --- plugin and sample audio are independently mutable -------------------
+    {
+        SamplePool pool;
+        loadFlat (pool, 5, 0.5f, 4000);
+        PluginRack rack;
+        SequencerEngine engine (pool, rack);
+        engine.audioDeviceAboutToStart (nullptr);
+        engine.setGain (1.0f);
+
+        auto pk = dtk::blankPatternKit (9);
+        pk.kit.sounds[0].sampleSlot = 5;
+        dtk::PatternEditor ed (pk);
+        ed.setLength (16);
+        ed.setTrig (0, 0, true);
+        engine.updateFromPattern (pk);
+
+        // Muting only the plugins must leave the sample tracks audible - the
+        // resampling workflow needs the opposite too.
+        engine.setPluginAudioEnabled (false);
+        engine.setLocalAudioEnabled (true);
+        engine.start();
+        auto out = render (engine, 2000);
+        check (peakBetween (out, 0, 1000) > 0.1f,
+               "muting the instruments leaves the sample tracks audible");
+
+        engine.stop();
+        engine.setLocalAudioEnabled (false);
+        engine.start();
+        out = render (engine, 2000);
+        check (peakBetween (out, 0, (int) out.size()) == 0.0f,
+               "muting the sample tracks silences them for a clean resample");
     }
 
     std::cout << "\n" << (checks - failures) << "/" << checks << " passed\n";

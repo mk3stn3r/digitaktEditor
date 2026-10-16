@@ -184,6 +184,40 @@ int main (int argc, char** argv)
         check (only, "a note edit changes only track[2].steps and track[2].lock:note");
     }
 
+    // --- OS build to storage version ----------------------------------------
+    {
+        // The build string, not the OS string, selects the structure versions.
+        const auto v152 = storageVersionsForBuild (Device::digitakt, "0095");
+        check (v152 && v152->patternAndKit == 9 && v152->projectSettings == 7,
+               "Digitakt OS 1.52 (build 0095) writes pattern v9 / settings v7");
+        check (osVersionForBuild (Device::digitakt, "0095") == "1.52",
+               "and maps back to a readable OS version");
+
+        const auto v130 = storageVersionsForBuild (Device::digitakt, "0053");
+        check (v130 && v130->patternAndKit == 6, "OS 1.30 writes pattern v6");
+
+        // A build between table entries takes the older one, because that is
+        // the last structure change the device is known to have.
+        const auto between = storageVersionsForBuild (Device::digitakt, "0090");
+        check (between && between->patternAndKit == 9,
+               "a build between entries uses the last known change");
+
+        check (! storageVersionsForBuild (Device::digitakt, "0001").has_value(),
+               "a build older than anything known is rejected rather than guessed");
+
+        // Newer than the table: usable, but flagged as a guess.
+        const auto future = storageVersionsForBuild (Device::digitakt, "0120");
+        check (future && future->patternAndKit == 9,
+               "a newer build falls back to the newest known versions");
+        check (buildIsNewerThanKnown (Device::digitakt, "0120"),
+               "and is reported as newer than the table");
+        check (! buildIsNewerThanKnown (Device::digitakt, "0095"),
+               "a known build is not reported as newer");
+
+        const auto dt2 = storageVersionsForBuild (Device::digitakt2, "0065");
+        check (dt2 && dt2->patternAndKit == 4, "Digitakt II 1.15 writes pattern v4");
+    }
+
     // --- dump requests: asking the device to send ---------------------------
     {
         // A request is the same envelope with an empty payload. Get a byte

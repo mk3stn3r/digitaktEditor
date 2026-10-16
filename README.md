@@ -15,6 +15,8 @@ can write offline and send the result to the machine later.
 
 ![remote control](docs/screenshot-remote.png)
 
+![instruments on the MIDI tracks](docs/screenshot-instruments.png)
+
 Built for **Digitakt I on Linux**, but nothing here is Linux-specific — the
 same CMake project builds on macOS and Windows.
 
@@ -35,6 +37,94 @@ same CMake project builds on macOS and Windows.
   the app is a usable sample sequencer on its own.
 - **Remote control** - drive the instrument from the editor's transport: MIDI
   clock, start/stop, and trigs as notes on the per-track channels.
+- **VST3 / LV2 instruments on the MIDI tracks** - M1-M8 become playable parts
+  of the same pattern.
+
+---
+
+## Instruments on the MIDI tracks
+
+The Digitakt's eight MIDI tracks send notes to external gear and make no sound
+of their own, so offline they were simply silent. The **Instruments** tab hosts
+one VST3 or LV2 instrument per MIDI track: M1-M8 are then sequenced by the same
+trigs, with the same note and velocity data, and mixed into the same output as
+the sample tracks.
+
+Scan once - the plugin list is remembered in
+`~/.config/digitakt-editor/plugins.xml`. Only plugins that declare themselves
+instruments are offered, because an effect cannot be sequenced from a MIDI
+track. Double-click a track to open its plugin editor; plugins without an
+editor of their own get JUCE's generic parameter view.
+
+On Linux the usual search paths are `~/.vst3` and `/usr/lib/vst3`, and `~/.lv2`
+and `/usr/lib/lv2`.
+
+### Playing the instruments from the Digitakt
+
+Turn on **Play these from the Digitakt's MIDI tracks** and the machine's own
+MIDI tracks drive the plugins live: notes, CC, pitch bend and aftertouch all
+pass through. Set the channel M1 sends on (M2 is the next one up, through M8)
+to match `MIDI CONFIG > CHANNELS` on the instrument.
+
+Live input is not limited to one note per step the way the sequencer grid is -
+play chords on the Digitakt and the plugin gets them. Incoming MIDI is handed
+straight to a `MidiMessageCollector` on the MIDI thread and consumed by the
+audio thread at the right sample offsets, so timing survives rather than being
+quantised to the audio block.
+
+### Resampling an instrument into the Digitakt
+
+Digitakt OS 1.20 added class-compliant USB audio, which is **two inputs as well
+as two outputs**. Audio arriving from the computer is mixed into Main, and the
+Digitakt can sample Main - so a hosted instrument can be recorded straight into
+one of the eight audio tracks:
+
+1. Digitakt: `SETTINGS > SYSTEM > USB CONFIG` = **USB AUDIO/MIDI**. Plain
+   USB MIDI carries no audio, and this needs OS 1.20 or later.
+2. Press **Audio...** and pick the Digitakt as the output device. The panel
+   says whether the current output looks like a Digitakt. If you hear nothing,
+   check the USB level under `SETTINGS > AUDIO ROUTING`.
+3. Turn **Sample tracks to the output** off, so only the instrument reaches the
+   machine. This silences voices already sounding, immediately - a ring-out
+   would land in the recording.
+4. Digitakt: `SAMPLING`, set `SOURCE` to **MAIN L+R**, arm and play.
+
+The Digitakt's analog `INPUT L/R` jacks are *not* routed to Main over USB -
+they are only audible while monitoring them for sampling. Audio from the
+computer is, which is why `MAIN L+R` is the source that works here and
+`IN L+R` is not.
+
+Instrument audio and sample audio are separately mutable for exactly this
+reason; one toggle is not enough.
+
+### Limits
+
+The grid stores one note per step per track, so the *sequencer* drives a MIDI
+track monophonically even when the instrument is polyphonic - a retrig releases
+the held note first. Live playing from the Digitakt has no such limit.
+
+The plugin rack is local playback: nothing about it is written into the
+pattern, and it does not change what the Digitakt's own MIDI tracks send to
+your hardware.
+
+Loading a plugin takes the rack's lock on the message thread, while the audio
+thread only ever try-locks it. A load in progress therefore costs a few
+milliseconds of plugin silence rather than an audio dropout.
+
+Two details that are easy to get wrong and crash on real plugins:
+
+**Channel count.** `processBlock` must be handed
+`max(total inputs, total outputs)` channels, which for an instrument is often
+more than two - multi-out and sidechain buses are common. A plugin can also
+change its bus layout when one of its settings changes, so the requirement is
+rechecked every block. If the scratch buffer is too small the slot is skipped
+for that block, because processing anyway would write past the end of it.
+
+**Editor lifetime.** `createEditorIfNeeded` returns the *same* editor object
+every time, so there is exactly one window per slot: a second owning window
+would delete the same editor twice. Closing a window destroys it rather than
+hiding it, which is what tells the plugin its editor is gone, and a slot's
+window is closed before that slot's plugin is replaced or cleared.
 
 ---
 
@@ -177,10 +267,11 @@ cmake --build build -j$(nproc)
 JUCE is fetched automatically the first time (~200 MB). If you already have a
 checkout, skip the download with `-DJUCE_PATH=/path/to/JUCE`.
 
-The binary lands at:
+The binaries land at:
 
 ```
 build/DigitaktPatternEditor_artefacts/Release/Digitakt Pattern Editor
+build/dtk-send_artefacts/Release/dtk-send
 ```
 
 Run the core tests with `cd build && ctest --output-on-failure`, or the test
@@ -296,9 +387,12 @@ device, dump again, compare.
 | +Drive API: dir ops, file transfer | **Certain** | Port of elk-herd's message definitions |
 | Sample slot p-locks | **Certain** | elk-herd decodes these; encoding is the inverse |
 | Dump request messages | **Certain** | Byte-exact against elk-herd's builder and the Python port |
+| OS build to storage version table | **Certain** | elk-herd's `digitaktVersions` |
 | Program change 0-127 = pattern 1-128 | **Certain** | Digitakt manual |
 | Per-track MIDI channels, clock required | **Certain** | Digitakt manual |
+| USB audio in is mixed to Main, and Main is samplable | **High** | Elektron OS 1.20 notes and the manual's sampling sources |
 | Digitakt I CC numbers | **Not shipped** | Published tables cover the DT II; the CC sender is raw |
+| Bulk SysEx needs rawmidi on Linux | **High** | JUCE's sequencer path discards the ALSA error code |
 | Slot numbering (1-based, 0 = none) | **High** | Matches elk-herd's default-kit check; affects local playback only |
 | +Drive sample file format | **Certain** | Port of elk-herd's `prepSamples` |
 
@@ -327,24 +421,193 @@ Source/SamplePool.h/.cpp      128 local slots, lock-free for the audio thread
 Source/SequencerEngine.h/.cpp the offline sequencer and voices
 Source/PoolPanel.h/.cpp       the sample pool tab
 Source/RemotePanel.h/.cpp     remote control settings
+Source/RawMidiOut.h/.cpp      ALSA rawmidi bulk output (the reliable path)
+Source/PluginRack.h/.cpp      one hosted instrument per MIDI track
+Source/InstrumentsPanel.h/.cpp  scanning and assignment UI
+Tools/dtk-send.cpp            GUI-free sender for isolating transfer problems
 
-Tests/TestCore.cpp           37 checks - format, round-trip, sample locks, requests
+Tests/TestCore.cpp           46 checks - format, round-trip, sample locks, requests
 Tests/TestApi.cpp            53 checks - protocol, transfers and decoding vs a mock
 Tests/TestSampleImport.cpp   15 checks - downmix, resample, header
-Tests/TestEngine.cpp         44 checks - step timing, voices, gating, locks,
-                                         clock, transport and note output
+Source/Log.h/.cpp             flushed logging and the crash handler
+
+Tests/TestRack.cpp           11 checks - plugin hosting against fake plugins
+Tests/TestEngine.cpp         59 checks - step timing, voices, gating, locks,
+                                         clock, transport, note output, rack
+                                         routing and live MIDI input
 ```
 
-149 checks in total, `ctest --output-on-failure` runs all four. The engine
+184 checks in total, `ctest --output-on-failure` runs all five. The rack tests
+use stand-in plugins that report more than stereo and change channel count
+mid-session, so the hosting bugs that only show up with a real VST are caught
+without one installed. The engine
 tests drive the audio callback directly with scratch buffers and capture the
 generated MIDI through a stub sink, so both halves are verified without a sound
 card or an instrument: four-on-the-floor lands within two samples of each beat
 and stays there at odd block sizes, one bar produces exactly 96 MIDI clocks
 with under half a millisecond of jitter, and every note that goes out comes
 back off - including when a retrig lands on a track that is still holding one.
+The plugin rack exposes the MIDI it has queued for each slot, so instrument
+routing is verified with no plugin installed: a trig on M3 reaches rack slot 3
+and no other, audio-track trigs never leak into the rack, and MIDI trigs with
+nothing loaded stay silent instead of crashing. Live input is checked the same
+way: channel 9 reaches M1 for notes and CC alike, a channel below the base is
+ignored rather than wrapped, and the two audio mutes are independent.
 
 The Python package still ships alongside this for scripting and batch work —
 its `--map` option for custom MIDI channel routing has no GUI equivalent yet.
+
+## The log
+
+Every run writes to:
+
+```
+~/.config/digitakt-editor/digitakt-editor.log
+```
+
+The previous run is kept beside it as `digitakt-editor.previous.log`, so the
+restart after a crash does not overwrite the report of the crash.
+
+Every line is flushed as it is written rather than buffered. That costs a
+little speed and buys the one thing that matters when diagnosing a crash: the
+last line before it actually reaches the disk.
+
+The log records the audio device and its rate and block size, MIDI ports as
+they open, plugin loads with their channel counts and latency, editor windows
+opening and closing, and any change a plugin reports about itself.
+
+**Crashes are caught and traced.** A fatal signal - SIGFPE, SIGSEGV and the
+rest - writes a stack trace into the log under `trace` before the process
+dies. The build passes `-rdynamic` and `-fno-omit-frame-pointer` so those
+traces name functions instead of printing bare addresses.
+
+A note on SIGFPE in particular: on Linux it means **integer** division by zero.
+Floating-point maths produces NaN or infinity, never a signal. So a "floating
+point exception" from a plugin is an integer divide, usually by a sample rate,
+block size or channel count that arrived as zero.
+
+### When a plugin's own GUI is the problem
+
+If a plugin crashes or misbehaves in its own interface, tick **Generic
+parameter editor** before opening it. That shows a plain list of the plugin's
+parameters instead of its GUI, so the plugin still works - you just do not run
+its interface code. The audio side is unaffected either way.
+
+The host side of editor handling is deliberately hands-off: the window adopts
+whatever size the editor asks for, and is only made resizable if the editor
+says it is resizable. A fixed-size VST3 view that gets resized anyway is being
+told its dimensions are something it never agreed to, and plugins do layout
+arithmetic on those numbers. No minimum size is forced; a genuinely degenerate
+size is rescued to 400x200 only because zero is a number things get divided by.
+
+### Reading a crash trace
+
+A trace with frames inside a plugin's `.so` and none of this app's own
+functions between them and the signal is a fault inside that plugin. To turn
+its addresses into source locations:
+
+```
+addr2line -e /path/to/Plugin.so -f -C 0x506b8c
+```
+
+That is the report to send to the plugin's author.
+
+### Plugins that change when their preset changes
+
+A preset can alter a plugin's bus layout, latency or expected block size, and
+the host has to respond. Every hosted plugin carries a listener that logs the
+change and flags the slot; the message thread acts on it.
+
+What it does matters. A channel-count change needs nothing from the plugin -
+only a bigger buffer on the host side - so that is all it does. It does **not**
+call `releaseResources` and `prepareToPlay`, because a preset changes while the
+plugin's editor is open, and tearing a plugin's resources down underneath its
+own interface will crash a plugin that did nothing wrong.
+
+A full re-prepare happens only when the sample rate or block size actually
+moved, which means the audio device changed - not while someone is clicking
+around in a plugin's UI.
+
+The audio thread never does any of this. It only ever declines to render a
+slot whose buffer no longer fits.
+
+## Troubleshooting: the Digitakt sits at WAITING DATA
+
+If you start a SysEx receive on the instrument and it just blinks WAITING DATA,
+the bytes are not reaching it. In order of likelihood:
+
+**1. `INPUT FROM` does not include USB.** This is the usual cause.
+`SETTINGS > MIDI CONFIG > PORT CONFIG > INPUT FROM` must be `MIDI+USB` or
+`USB`. The setting is **saved with the project**, and a new project defaults to
+MIDI only - so it silently reverts every time you switch projects.
+
+**2. `USB CONFIG` is set to Overbridge.** `SETTINGS > SYSTEM > USB CONFIG` must
+be `USB MIDI`. In Overbridge mode the machine is not a class-compliant MIDI
+device and Linux will not talk to it.
+
+**3. Isolate the app from the device** with the bundled command-line sender,
+which has no GUI, no audio and no sequencer in the way:
+
+```
+cd build/dtk-send_artefacts/Release
+./dtk-send --list                      # what ports exist
+./dtk-send --verify pattern.syx        # is the file even valid?
+./dtk-send --port hw:2,0,0 pattern.syx # send it, byte count reported
+```
+
+`--verify` parses the file and prints its storage version without sending
+anything. If it reports a parse error, the problem is the file, not the cable.
+If `dtk-send` reports all bytes accepted and the machine still waits, the bytes
+left this computer and the instrument declined them - which points back at 1
+and 2.
+
+**4. Storage version.** `--verify` prints it. A dump written for a newer
+Digitakt OS than yours will be refused.
+
+The app now asks the instrument which OS it runs as soon as a MIDI port opens,
+and makes new patterns in the matching format, so this should take care of
+itself. The mapping is by *build* string rather than the OS string, because the
+build is a zero-padded number that compares correctly:
+
+| Digitakt OS | build | pattern | project settings |
+|---|---|---|---|
+| 1.20 | 0037 | 5 | 3 |
+| 1.30 | 0053 | 6 | 5 |
+| 1.40 | 0070 | 7 | 6 |
+| 1.50 - 1.52A | 0084 - 0097 | **9** | 7 |
+
+So **OS 1.52 writes pattern storage version 9**, which is what the app defaults
+to anyway. A build newer than this table still works - it falls back to the
+newest known versions and says so, rather than refusing outright the way
+elk-herd does.
+
+### A note on how the raw port is opened
+
+JUCE's MIDI output holds the Digitakt's hardware port open through the ALSA
+*sequencer*. Opening that same port again for raw access without
+`SND_RAWMIDI_APPEND` waits for it to be released, which never happens - so a
+plain blocking open freezes whatever thread calls it.
+
+The port is therefore opened with `SND_RAWMIDI_APPEND | SND_RAWMIDI_NONBLOCK`
+(falling back to non-blocking alone if a driver rejects APPEND), and writes are
+switched back to blocking afterwards so a 31 KB dump still arrives whole. The
+open also runs on a worker thread rather than the message thread: enumerating
+ALSA cards and opening a hardware port has no business on the thread that
+draws the UI, whatever the flags say.
+
+### Why this needed fixing in the code, too
+
+A pattern dump is ~31 KB in a single SysEx message. `juce::MidiOutput` on Linux
+goes through the ALSA **sequencer**, and its `sendMessageNow` returns `void` -
+the ALSA error code is discarded. The app could not tell a failed send from a
+successful one, and said "sent" either way.
+
+Bulk transfers now go over ALSA **rawmidi** instead - the same transport
+`amidi` uses. It blocks until the driver has taken every byte, then flushes,
+and reports exactly how far it got. Real-time traffic (clock, notes) stays on
+the sequencer, where timestamps are what matter. The app picks the rawmidi port
+automatically and names the transport it used in the status line, so "sent via
+raw MIDI hw:2,0,0" now means something.
 
 ## Cautions
 

@@ -4,6 +4,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "Log.h"
 #include "MainComponent.h"
 
 class DigitaktEditorApplication : public juce::JUCEApplication
@@ -15,6 +16,12 @@ public:
 
     void initialise (const juce::String& commandLine) override
     {
+        // First thing, so the crash handler is installed before any plugin,
+        // driver or device code runs.
+        dtklog::start();
+        DTK_LOG ("app", "version " + getApplicationVersion()
+                        + ", command line: " + commandLine);
+
         mainWindow = std::make_unique<MainWindow> (getApplicationName());
 
         // Opening a .syx straight from the command line makes the app usable
@@ -32,7 +39,12 @@ public:
         }
     }
 
-    void shutdown() override { mainWindow = nullptr; }
+    void shutdown() override
+    {
+        DTK_LOG ("app", "shutting down");
+        mainWindow = nullptr;
+        DTK_LOG ("app", "clean exit");
+    }
 
     void systemRequestedQuit() override { quit(); }
 

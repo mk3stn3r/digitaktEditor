@@ -23,6 +23,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 
 #include "DigitaktCore.h"
+#include "PluginRack.h"
 #include "SamplePool.h"
 
 /** Where the engine's generated MIDI goes.
@@ -40,10 +41,12 @@ class SequencerEngine : public juce::AudioIODeviceCallback
 {
 public:
     static constexpr int numAudioTracks = 8;
+    static constexpr int numMidiTracks = 8;      // M1-M8, hosted as plugins
+    static constexpr int numTracks = numAudioTracks + numMidiTracks;
     static constexpr int maxSteps = 64;
     static constexpr int numSnapshots = 4;
 
-    explicit SequencerEngine (SamplePool& p) : pool (p) {}
+    SequencerEngine (SamplePool& p, PluginRack& r) : pool (p), rack (r) {}
     ~SequencerEngine() override = default;
 
     /** Rebuilds the snapshot the audio thread plays from. Message thread only. */
@@ -85,9 +88,33 @@ public:
     void setRemoteConfig (RemoteConfig);
     RemoteConfig remoteConfig() const;
 
-    /** Turn the local voices off to hear only the instrument. */
+    /** Turn the sample voices off to hear only the instrument. */
     void setLocalAudioEnabled (bool b) noexcept { localAudio.store (b); }
     bool localAudioEnabled() const noexcept { return localAudio.load(); }
+
+    /** Plugin output is controlled separately from the sample voices, so the
+        MIDI-track instruments can be sent to the Digitakt on their own for
+        resampling while the sample tracks stay silent. */
+    void setPluginAudioEnabled (bool b) noexcept { pluginAudio.store (b); }
+    bool pluginAudioEnabled() const noexcept { return pluginAudio.load(); }
+
+    //== playing the instruments from the Digitakt ============================
+    /** Feeds live MIDI from the instrument to the hosted plugins.
+
+        Call from the MIDI input thread. Messages are queued with their
+        timestamps and consumed by the audio thread at the right sample
+        offsets, so a part played on the Digitakt's MIDI tracks arrives in
+        time rather than quantised to the block. */
+    void handleExternalMidi (const juce::MidiMessage&);
+
+    /** `baseChannel` is the channel the Digitakt's M1 sends on; M2 is the
+        next one up, and so on through M8. */
+    void setExternalMidiInput (bool enabled, int baseChannel);
+    bool externalMidiEnabled() const noexcept { return externalMidi.load(); }
+    int  externalMidiBaseChannel() const noexcept { return externalBase.load(); }
+
+    /** Test hook: how many external messages have been routed to a slot. */
+    int externalMessagesRouted (int slot) const;
 
     void audioDeviceIOCallbackWithContext (const float* const*, int,
                                            float* const* outputChannelData,
@@ -110,7 +137,7 @@ private:
     {
         double tempo { 120.0 };
         int    length { 16 };
-        StepData steps[numAudioTracks][maxSteps];
+        StepData steps[numTracks][maxSteps];
     };
 
     struct Voice
@@ -126,6 +153,9 @@ private:
     };
 
     void advanceStep (int sampleOffset);
+    void emitPluginNoteOn (int midiTrack, const StepData&, double samplesPerStep,
+                           int offset);
+    void emitPluginNoteOff (int midiTrack, int offset);
     void fireStep (int step, int sampleOffset);
     void emitNoteOn (int track, const StepData&, double samplesPerStep, int offset);
     void emitNoteOff (int track, int offset);
@@ -135,6 +165,7 @@ private:
                      double gateSamples);
 
     SamplePool& pool;
+    PluginRack& rack;
 
     Snapshot snapshots[numSnapshots];
     std::atomic<int> liveSnapshot { 0 };
@@ -158,7 +189,18 @@ private:
     double samplesUntilNextClock { 0.0 };
     int    activeMidiNote[numAudioTracks] { -1, -1, -1, -1, -1, -1, -1, -1 };
     double midiGateLeft[numAudioTracks] { -1, -1, -1, -1, -1, -1, -1, -1 };
+
+    // Notes currently held by the hosted instruments on the MIDI tracks.
+    int    pluginNote[numMidiTracks] { -1, -1, -1, -1, -1, -1, -1, -1 };
+    double pluginGateLeft[numMidiTracks] { -1, -1, -1, -1, -1, -1, -1, -1 };
     std::atomic<bool> localAudio { true };
+    std::atomic<bool> pluginAudio { true };
+
+    // live MIDI in from the instrument
+    juce::MidiMessageCollector externalCollector;
+    std::atomic<bool> externalMidi { false };
+    std::atomic<int>  externalBase { 9 };
+    std::atomic<int>  externalRouted[numMidiTracks] {};
     std::atomic<bool> pendingStart { false };
     std::atomic<bool> pendingStop { false };
 

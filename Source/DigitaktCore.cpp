@@ -1060,6 +1060,76 @@ ElkDump makePatternKitDump (const PatternKit& pk, int index, Device device)
 }
 
 //==============================================================================
+namespace
+{
+    struct BuildEntry { const char* build; const char* os; int settings; int pattern; };
+
+    // From elk-herd's digitaktVersions / digitakt2Versions tables.
+    const BuildEntry digitaktBuilds[] = {
+        { "0019", "1.08",   1, 2 }, { "0021", "1.10",   1, 2 },
+        { "0022", "1.11b1", 2, 3 }, { "0029", "1.11b7", 2, 4 },
+        { "0032", "1.11",   2, 4 }, { "0033", "1.1x",   3, 4 },
+        { "0037", "1.20",   3, 5 }, { "0053", "1.30",   5, 6 },
+        { "0064", "1.30B",  5, 6 }, { "0070", "1.40",   6, 7 },
+        { "0073", "1.40A",  6, 7 }, { "0077", "1.40B",  6, 7 },
+        { "0084", "1.50",   7, 9 }, { "0088", "1.51",   7, 9 },
+        { "0089", "1.51A",  7, 9 }, { "0095", "1.52",   7, 9 },
+        { "0097", "1.52A",  7, 9 },
+    };
+
+    const BuildEntry digitakt2Builds[] = {
+        { "0035", "1.02",  0, 0 }, { "0039", "1.03",  0, 0 },
+        { "0041", "1.03A", 0, 0 }, { "0048", "1.10",  1, 3 },
+        { "0053", "1.10A", 1, 3 }, { "0065", "1.15",  1, 4 },
+        { "0069", "1.15A", 1, 4 },
+    };
+
+    struct Table { const BuildEntry* entries; size_t count; };
+
+    Table tableFor (Device d)
+    {
+        if (d == Device::digitakt)
+            return { digitaktBuilds, sizeof (digitaktBuilds) / sizeof (BuildEntry) };
+        return { digitakt2Builds, sizeof (digitakt2Builds) / sizeof (BuildEntry) };
+    }
+
+    const BuildEntry* findEntry (Device d, const std::string& build)
+    {
+        const auto t = tableFor (d);
+        const BuildEntry* found = nullptr;
+        for (size_t i = 0; i < t.count; ++i)
+        {
+            // Build strings are zero-padded, so a string compare is a numeric
+            // compare. Take the last entry that does not exceed the device's.
+            if (build < t.entries[i].build) break;
+            found = &t.entries[i];
+        }
+        return found;
+    }
+}
+
+std::optional<StorageVersions> storageVersionsForBuild (Device d, const std::string& build)
+{
+    if (const auto* e = findEntry (d, build))
+        return StorageVersions { e->settings, e->pattern };
+    return std::nullopt;
+}
+
+bool buildIsNewerThanKnown (Device d, const std::string& build)
+{
+    const auto t = tableFor (d);
+    if (t.count == 0) return true;
+    return build > t.entries[t.count - 1].build;
+}
+
+std::string osVersionForBuild (Device d, const std::string& build)
+{
+    if (const auto* e = findEntry (d, build))
+        return (build == e->build) ? e->os : (std::string ("newer than ") + e->os);
+    return {};
+}
+
+//==============================================================================
 PatternKit blankPatternKit (int storageVersion)
 {
     return PatternKit::fromBytes (blankData ("blankPatternKit", storageVersion),

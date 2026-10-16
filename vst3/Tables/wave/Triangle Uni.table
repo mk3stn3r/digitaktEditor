@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<TABLE>
+<PARAM id="Step 1" value="0.0"/>
+<PARAM id="Step 2" value="12.0"/>
+<PARAM id="Step 3" value="25.0"/>
+<PARAM id="Step 4" value="38.0"/>
+<PARAM id="Step 5" value="50.0"/>
+<PARAM id="Step 6" value="62.0"/>
+<PARAM id="Step 7" value="75.0"/>
+<PARAM id="Step 8" value="88.0"/>
+<PARAM id="Step 9" value="100.0"/>
+<PARAM id="Step 10" value="88.0"/>
+<PARAM id="Step 11" value="75.0"/>
+<PARAM id="Step 12" value="62.0"/>
+<PARAM id="Step 13" value="50.0"/>
+<PARAM id="Step 14" value="38.0"/>
+<PARAM id="Step 15" value="25.0"/>
+<PARAM id="Step 16" value="12.0"/>
+</TABLE>

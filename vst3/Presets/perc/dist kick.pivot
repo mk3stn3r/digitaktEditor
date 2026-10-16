@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<STATE>
+  <PARAMETERS>
+    <PARAM id="Cutoff" value="0.0"/>
+    <PARAM id="Distortion" value="49.99998092651367"/>
+    <PARAM id="Env 1 Attack" value="0.0"/>
+    <PARAM id="Env 1 Decay" value="26.50000381469727"/>
+    <PARAM id="Env 1 Depth 1" value="22.00000381469727"/>
+    <PARAM id="Env 1 Depth 2" value="0.0"/>
+    <PARAM id="Env 1 Depth 3" value="0.0"/>
+    <PARAM id="Env 1 Depth 4" value="0.0"/>
+    <PARAM id="Env 1 Depth 5" value="0.0"/>
+    <PARAM id="Env 1 Depth 6" value="0.0"/>
+    <PARAM id="Env 1 Level" value="100.0"/>
+    <PARAM id="Env 1 Release" value="17.5000171661377"/>
+    <PARAM id="Env 1 Sustain" value="0.0"/>
+    <PARAM id="Env 2 Attack" value="0.0"/>
+    <PARAM id="Env 2 Decay" value="33.5000114440918"/>
+    <PARAM id="Env 2 Depth 1" value="2.999997138977051"/>
+    <PARAM id="Env 2 Depth 2" value="0.0"/>
+    <PARAM id="Env 2 Depth 3" value="0.0"/>
+    <PARAM id="Env 2 Depth 4" value="0.0"/>
+    <PARAM id="Env 2 Depth 5" value="0.0"/>
+    <PARAM id="Env 2 Depth 6" value="0.0"/>
+    <PARAM id="Env 2 Level" value="100.0"/>
+    <PARAM id="Env 2 Release" value="27.50003433227539"/>
+    <PARAM id="Env 2 Sustain" value="0.0"/>
+    <PARAM id="Filter Attack" value="0.0"/>
+    <PARAM id="Filter Decay" value="13.00000381469727"/>
+    <PARAM id="Filter Env Depth" value="53.50001525878906"/>
+    <PARAM id="Filter Keytracking" value="1.0"/>
+    <PARAM id="Filter Mix" value="100.0"/>
+    <PARAM id="Filter Release" value="50.0"/>
+    <PARAM id="Filter State" value="1.0"/>
+    <PARAM id="Filter Sustain" value="0.0"/>
+    <PARAM id="Glide Time" value="59.99998474121094"/>
+    <PARAM id="LFO 1 Depth 1" value="0.0"/>
+    <PARAM id="LFO 1 Depth 2" value="0.0"/>
+    <PARAM id="LFO 1 Depth 3" value="0.0"/>
+    <PARAM id="LFO 1 Depth 4" value="0.0"/>
+    <PARAM id="LFO 1 Depth 5" value="0.0"/>
+    <PARAM id="LFO 1 Depth 6" value="0.0"/>
+    <PARAM id="LFO 1 Level" value="100.0"/>
+    <PARAM id="LFO 1 Note value" value="15.0"/>
+    <PARAM id="LFO 1 Polarity" value="1.0"/>
+    <PARAM id="LFO 1 Rate" value="25.0"/>
+    <PARAM id="LFO 1 Reset" value="0.0"/>
+    <PARAM id="LFO 1 Shape" value="2.0"/>
+    <PARAM id="LFO 1 Skew" value="-0.00002384185791015625"/>
+    <PARAM id="LFO 1 Sync" value="1.0"/>
+    <PARAM id="LFO 2 Depth 1" value="0.0"/>
+    <PARAM id="LFO 2 Depth 2" value="0.0"/>
+    <PARAM id="LFO 2 Depth 3" value="0.0"/>
+    <PARAM id="LFO 2 Depth 4" value="0.0"/>
+    <PARAM id="LFO 2 Depth 5" value="0.0"/>
+    <PARAM id="LFO 2 Depth 6" value="0.0"/>
+    <PARAM id="LFO 2 Level" value="100.0"/>
+    <PARAM id="LFO 2 Note value" value="0.0"/>
+    <PARAM id="LFO 2 Polarity" value="1.0"/>
+    <PARAM id="LFO 2 Rate" value="25.0"/>
+    <PARAM id="LFO 2 Reset" value="0.0"/>
+    <PARAM id="LFO 2 Shape" value="0.0"/>
+    <PARAM id="LFO 2 Skew" value="0.0"/>
+    <PARAM id="LFO 2 Sync" value="0.0"/>
+    <PARAM id="Main Volume" value="100.0"/>
+    <PARAM id="Mod Dest 1" value="0.0"/>
+    <PARAM id="Mod Dest 2" value="1.0"/>
+    <PARAM id="Mod Dest 3" value="23.0"/>
+    <PARAM id="Mod Dest 4" value="16.0"/>
+    <PARAM id="Mod Dest 5" value="5.0"/>
+    <PARAM id="Mod Dest 6" value="4.0"/>
+    <PARAM id="OP 1 Attack" value="0.0"/>
+    <PARAM id="OP 1 Decay" value="13.49997997283936"/>
+    <PARAM id="OP 1 Phase Offset" value="2.0"/>
+    <PARAM id="OP 1 Phase Reset" value="1.0"/>
+    <PARAM id="OP 1 Release" value="44.4999885559082"/>
+    <PARAM id="OP 1 Sustain" value="100.0"/>
+    <PARAM id="OP 2 Attack" value="0.0"/>
+    <PARAM id="OP 2 Coarse" value="2.0"/>
+    <PARAM id="OP 2 Decay" value="45.00683975219727"/>
+    <PARAM id="OP 2 Feedback" value="42.49999237060547"/>
+    <PARAM id="OP 2 Fine" value="0.004999999888241291"/>
+    <PARAM id="OP 2 Level" value="25.0000114440918"/>
+    <PARAM id="OP 2 Phase Offset" value="2.0"/>
+    <PARAM id="OP 2 Phase Reset" value="1.0"/>
+    <PARAM id="OP 2 Release" value="24.50003433227539"/>
+    <PARAM id="OP 2 Sustain" value="47.94520568847656"/>
+    <PARAM id="OP 3 Attack" value="0.5"/>
+    <PARAM id="OP 3 Coarse" value="4.0"/>
+    <PARAM id="OP 3 Decay" value="74.49996185302734"/>
+    <PARAM id="OP 3 Feedback" value="59.50001525878906"/>
+    <PARAM id="OP 3 Fine" value="0.0"/>
+    <PARAM id="OP 3 Level" value="20.49999809265137"/>
+    <PARAM id="OP 3 Phase Offset" value="4.0"/>
+    <PARAM id="OP 3 Phase Reset" value="1.0"/>
+    <PARAM id="OP 3 Release" value="30.49998664855957"/>
+    <PARAM id="OP 3 Route" value="69.49998474121094"/>
+    <PARAM id="OP 3 Sustain" value="0.0"/>
+    <PARAM id="Pitch Offset" value="0.0"/>
+    <PARAM id="Resonance" value="60.99999618530273"/>
+    <PARAM id="Stereo Width" value="0.0"/>
+    <PARAM id="Unison" value="0.0"/>
+    <PARAM id="Velocity Depth 1" value="0.0"/>
+    <PARAM id="Velocity Depth 2" value="100.0"/>
+    <PARAM id="Velocity Depth 3" value="0.0"/>
+    <PARAM id="Velocity Depth 4" value="0.0"/>
+    <PARAM id="Velocity Depth 5" value="0.0"/>
+    <PARAM id="Velocity Depth 6" value="0.0"/>
+    <PARAM id="Velocity Level" value="100.0"/>
+    <PARAM id="Voice Count" value="1.0"/>
+  </PARAMETERS>
+  <PROPERTIES plugin_version="1.0" uiscale="1.0"/>
+  <PRESET PRESET_NAME="dist kick"/>
+</STATE>

@@ -1,5 +1,7 @@
 #include "MainComponent.h"
 
+#include "Log.h"
+
 namespace
 {
     const juce::Colour panelBg { 0xff16181c };
@@ -89,13 +91,25 @@ MainComponent::MainComponent()
                 requester.setOutput (midi.rawOutput());
 
                 // A background thread is what makes timestamped clock accurate.
+                DTK_LOG ("midi", "output opened: " + outputs[i].name);
                 if (auto* out = midi.rawOutput()) out->startBackgroundThread();
                 midiSink.output.store (midi.rawOutput());
                 remotePanel.setConnected (true, outputs[i].name);
+
+                // Knowing the OS tells us which storage version to write.
+                samplesPanel.identifyDevice();
+
+                // Bulk dumps go over rawmidi, which is the only Linux path
+                // that can report whether 31 KB actually left the machine.
+                // Opening it happens on a worker thread: this enumerates ALSA
+                // cards and opens a hardware port, and nothing that touches a
+                // driver belongs on the thread that draws the UI.
+                openRawPortInBackground();
             }
             else
             {
                 midiSink.output.store (nullptr);
+                midi.closeRawPort();
                 remotePanel.setConnected (false, {});
                 setStatus ("could not open " + outputs[i].name + " for output", true);
             }
@@ -107,6 +121,7 @@ MainComponent::MainComponent()
         if (i >= 0 && i < inputs.size())
         {
             midi.closeInput();
+            DTK_LOG ("midi", "opening input: " + inputs[i].name);
             if (! midi.openInput (inputs[i].identifier))
                 setStatus ("could not open " + inputs[i].name + " for input", true);
         }
@@ -125,7 +140,9 @@ MainComponent::MainComponent()
     tabs.addTab ("Pattern", panelBg, &gridPage, false);
     tabs.addTab ("+Drive samples", panelBg, &samplesPanel, false);
     tabs.addTab ("Sample pool", panelBg, &poolPanel, false);
+    tabs.addTab ("Instruments", panelBg, &instrumentsPanel, false);
     tabs.addTab ("Remote", panelBg, &remotePanel, false);
+    instrumentsPanel.setListener (this);
     poolPanel.setListener (this);
     remotePanel.setListener (this);
     engine.setMidiSink (&midiSink);
@@ -137,6 +154,21 @@ MainComponent::MainComponent()
     {
         audioDevices.addAudioCallback (&engine);
         audioReady = true;
+
+        if (auto* d = audioDevices.getCurrentAudioDevice())
+            DTK_LOG ("audio", "opened " + d->getName()
+                     + "  rate=" + juce::String (d->getCurrentSampleRate(), 0)
+                     + " block=" + juce::String (d->getCurrentBufferSizeSamples())
+                     + " outs=" + juce::String (d->getActiveOutputChannels().countNumberOfSetBits()));
+        else
+            // Reported success but handed back no device: the callback will
+            // never fire, which looks exactly like "Play does nothing".
+            DTK_LOG ("audio", "initialised without error but there is no current "
+                              "device - playback will be silent");
+    }
+    else
+    {
+        DTK_LOG ("audio", "could not open an output: " + audioStartupError);
     }
     // Play stays enabled even without a device: clicking it explains the
     // problem, which survives later status messages in a way a startup line
@@ -157,17 +189,29 @@ MainComponent::MainComponent()
     startTimer (33);
 
     newPattern();
-    setSize (1180, 680);
+    refreshAudioOutputName();
+    setSize (1180, 760);
 }
 
 MainComponent::~MainComponent()
 {
+    // The rawmidi probe runs on a worker thread and uses `midi`, so it has to
+    // finish before any member is destroyed. Bounded, so a wedged driver
+    // cannot stop the app from quitting.
+    const auto deadline = juce::Time::getMillisecondCounter() + 3000;
+    while (rawProbeRunning.load()
+           && juce::Time::getMillisecondCounter() < deadline)
+        juce::Thread::sleep (10);
+
     // Remove the callback before anything the audio thread touches goes away,
     // and detach the sink before the port it points at is closed.
     if (audioReady) audioDevices.removeAudioCallback (&engine);
     engine.setMidiSink (nullptr);
     midiSink.output.store (nullptr);
     engine.stop();
+    // Deliberately no rack.clearAll() here: instrumentsPanel owns the editor
+    // windows and is destroyed before rack, so the plugins must outlive this
+    // function. Clearing them here would leave editors pointing at nothing.
     midi.setListener (nullptr);
     stopTimer();
 }
@@ -382,6 +426,11 @@ void MainComponent::timerCallback()
         grid.setPlayhead (-1);
     }
 
+    // A plugin that changed its layout (a preset switch, usually) is prepared
+    // again here, on the message thread, never in the audio callback.
+    if (rack.takeNeedsReprepare())
+        rack.reprepareChangedSlots();
+
     if (autoSendArmed && autoSendCountdown > 0 && --autoSendCountdown == 0)
         autoSendNow();
 
@@ -421,12 +470,60 @@ void MainComponent::refreshEngine()
     std::sort (used.begin(), used.end());
     used.erase (std::unique (used.begin(), used.end()), used.end());
     poolPanel.setSlotsInUse (used);
+
+    // MIDI tracks 9-16 map onto instrument slots 0-7.
+    std::vector<int> midiUsed;
+    for (int t = 8; t < (int) pk.pattern.tracks.size() && t < 16; ++t)
+        if (pk.pattern.tracks[(size_t) t].anyTrigs())
+            midiUsed.push_back (t - 8);
+    instrumentsPanel.setTracksInUse (midiUsed);
 }
 
 void MainComponent::poolChanged()
 {
     refreshEngine();
     grid.repaint();
+}
+
+void MainComponent::instrumentsChanged()
+{
+    refreshEngine();
+    grid.repaint();
+}
+
+void MainComponent::externalMidiChanged (bool enabled, int baseChannel)
+{
+    engine.setExternalMidiInput (enabled, baseChannel);
+
+    if (! enabled) { setStatus ("Live MIDI input to the instruments is off."); return; }
+
+    if (! midi.inputOpen())
+    {
+        setStatus ("Choose a MIDI input port in the toolbar - without one there "
+                   "is nothing for the Digitakt to play the instruments with.", true);
+        return;
+    }
+    setStatus ("M1-M8 will follow the Digitakt on channels "
+               + juce::String (baseChannel) + "-"
+               + juce::String (juce::jmin (16, baseChannel + 7))
+               + ". Set those channels on the machine under MIDI CONFIG > CHANNELS.");
+}
+
+void MainComponent::pluginAudioChanged (bool enabled)
+{
+    engine.setPluginAudioEnabled (enabled);
+}
+
+void MainComponent::sampleAudioChanged (bool enabled)
+{
+    engine.setLocalAudioEnabled (enabled);
+}
+
+void MainComponent::liveMidiReceived (const juce::MidiMessage& m)
+{
+    // Called on the MIDI thread: hand straight to the engine's collector,
+    // which is built for exactly this hand-off.
+    engine.handleExternalMidi (m);
 }
 
 //==============================================================================
@@ -465,9 +562,9 @@ void MainComponent::autoSendNow()
     if (d == nullptr || ! midi.outputOpen()) return;
 
     d->refreshContent();
-    juce::String error;
-    if (midi.send (*d, error))
-        setStatus ("Auto-sent to slot " + juce::String (d->index)
+    juce::String error, via;
+    if (midi.send (*d, error, &via))
+        setStatus ("Auto-sent to slot " + juce::String (d->index) + " via " + via
                    + " - the Digitakt must be at WAITING DATA to accept it.");
     else
         setStatus ("Auto-send failed: " + error, true);
@@ -556,6 +653,47 @@ void MainComponent::showAudioSettings()
         audioStartupError.clear();
         setStatus ("Audio output ready - press Play.");
     }
+    refreshAudioOutputName();
+}
+
+void MainComponent::openRawPortInBackground()
+{
+    if (rawProbeRunning.exchange (true)) return;   // one probe at a time
+
+    juce::Component::SafePointer<MainComponent> safe (this);
+
+    juce::Thread::launch ([this, safe]
+    {
+        juce::String error;
+        const bool ok = midi.openRawPortAutomatically (error);
+        const auto id = midi.rawPortId();
+
+        // Cleared here, on the worker, not in the callAsync below: the
+        // destructor waits on this flag, and it waits on the message thread,
+        // which is the thread that would have to run the callAsync.
+        rawProbeRunning.store (false);
+
+        juce::MessageManager::callAsync ([safe, ok, error, id]
+        {
+            if (auto* self = safe.getComponent())
+            {
+                if (ok)
+                    self->setStatus ("Using raw MIDI " + id
+                                     + " for pattern transfers.");
+                else if (RawMidiOut::available())
+                    self->setStatus ("Raw MIDI unavailable (" + error
+                                     + ") - large dumps will use the sequencer "
+                                       "port, which cannot confirm delivery.", true);
+            }
+        });
+    });
+}
+
+void MainComponent::refreshAudioOutputName()
+{
+    auto* device = audioDevices.getCurrentAudioDevice();
+    instrumentsPanel.setAudioOutputName (device != nullptr ? device->getName()
+                                                           : juce::String());
 }
 
 //==============================================================================
@@ -565,7 +703,7 @@ void MainComponent::newPattern()
     {
         try
         {
-            auto pk = dtk::blankPatternKit (dtk::latestDT1PatternVersion);
+            auto pk = dtk::blankPatternKit (deviceStorageVersion);
             std::vector<dtk::ElkDump> d { dtk::makePatternKitDump (pk, 0) };
             currentFile = juce::File();
             loadDumps (std::move (d), "New pattern");
@@ -697,8 +835,12 @@ void MainComponent::sendToDevice()
     juce::AlertWindow::showOkCancelBox (
         juce::MessageBoxIconType::QuestionIcon, "Send to Digitakt",
         "On the Digitakt:\n\n"
-        "  SETTINGS > SYSEX DUMP > SYSEX RECEIVE > PATTERN\n"
-        "  choose the target slot, then check the screen reads WAITING DATA.\n\n"
+        "  1. SETTINGS > SYSTEM > USB CONFIG = USB MIDI (not Overbridge)\n"
+        "  2. SETTINGS > MIDI CONFIG > PORT CONFIG > INPUT FROM = MIDI+USB\n"
+        "     This one is saved per project and a new project defaults to\n"
+        "     MIDI only, so it is the usual reason WAITING DATA never ends.\n"
+        "  3. SETTINGS > SYSEX DUMP > SYSEX RECEIVE > PATTERN, choose the\n"
+        "     target slot, and check the screen reads WAITING DATA.\n\n"
         "Back up the target pattern first - this overwrites it.",
         "Send", "Cancel", nullptr,
         juce::ModalCallbackFunction::create ([this] (int result)
@@ -708,10 +850,14 @@ void MainComponent::sendToDevice()
             if (auto* d = activeDump())
             {
                 d->refreshContent();
-                juce::String error;
-                if (midi.send (*d, error))
-                    setStatus ("sent to slot " + juce::String (d->index)
-                               + " - the Digitakt should have shown WRITING DATA");
+                juce::String error, via;
+                if (midi.send (*d, error, &via))
+                    setStatus (juce::String ((int) d->toBytes().size())
+                               + " bytes sent to slot " + juce::String (d->index)
+                               + " via " + via
+                               + " - the Digitakt should have shown WRITING DATA. "
+                                 "If it still says WAITING DATA, check MIDI CONFIG "
+                                 "> PORT CONFIG > INPUT FROM includes USB.");
                 else
                     setStatus ("send failed: " + error, true);
             }
@@ -855,6 +1001,35 @@ void MainComponent::assignSampleToSlot (const dtk::api::DirEntry& entry, int slo
 void MainComponent::statusMessage (const juce::String& text, bool isError)
 {
     setStatus (text, isError);
+}
+
+void MainComponent::deviceVersionKnown (const juce::String& build,
+                                        const juce::String& osVersion)
+{
+    deviceOsVersion = osVersion;
+
+    const auto versions = dtk::storageVersionsForBuild (dtk::Device::digitakt,
+                                                        build.toStdString());
+    if (! versions)
+    {
+        setStatus ("Digitakt OS " + osVersion + " (build " + build
+                   + ") is older than anything this build knows about; new "
+                     "patterns will use storage version "
+                   + juce::String (deviceStorageVersion) + ".", true);
+        return;
+    }
+
+    deviceStorageVersion = versions->patternAndKit;
+
+    juce::String note = "Digitakt OS " + osVersion + " writes pattern storage "
+                        "version " + juce::String (deviceStorageVersion)
+                      + "; new patterns will match it.";
+
+    if (dtk::buildIsNewerThanKnown (dtk::Device::digitakt, build.toStdString()))
+        note << "  This OS is newer than the version table, so that is a best "
+                "guess - check a pattern received from the machine.";
+
+    setStatus (note);
 }
 
 //==============================================================================

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<THEME>
+    <COLOR id="Dark" value="C8D2EA"/>
+    <COLOR id="Mid" value="6168C3"/>
+    <COLOR id="Bright" value="314452"/>
+    <COLOR id="Hover" value="FFFFFF"/>
+    <COLOR id="Accent One" value="D4A339"/>
+    <COLOR id="Accent Two" value="D15D1E"/>
+</THEME>

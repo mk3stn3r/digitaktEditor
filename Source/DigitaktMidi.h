@@ -11,6 +11,7 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 
 #include "DigitaktCore.h"
+#include "RawMidiOut.h"
 
 //==============================================================================
 /** Sends and receives Elektron dumps over a MIDI port. */
@@ -27,6 +28,10 @@ public:
         virtual void midiError (const juce::String&) = 0;
         /** Every SysEx message, dump or not, so the API client can see replies. */
         virtual void rawSysExReceived (const dtk::Bytes&) {}
+
+        /** Live channel messages, delivered on the MIDI thread rather than
+            deferred, so their timestamps stay usable for scheduling. */
+        virtual void liveMidiReceived (const juce::MidiMessage&) {}
     };
 
     DigitaktMidi() = default;
@@ -72,20 +77,72 @@ public:
     bool inputOpen()  const noexcept { return input  != nullptr; }
 
     //== sending ==============================================================
-    /** Sends one dump. The message must already be a framed F0..F7 blob;
-        juce::MidiMessage::createSysExMessage adds the framing itself, so we
-        hand it only the body. */
-    bool send (const dtk::ElkDump& dump, juce::String& errorOut)
-    {
-        if (output == nullptr) { errorOut = "no MIDI output is open"; return false; }
+    /** Sends one dump, preferring the raw MIDI port.
 
+        A pattern dump is ~31 KB in one SysEx message. juce::MidiOutput goes
+        through the ALSA *sequencer*, whose sendMessageNow returns void - the
+        ALSA error code is discarded, so a failed send cannot be distinguished
+        from a successful one. Raw MIDI is the transport `amidi` uses, blocks
+        until the bytes are gone, and reports what happened.
+
+        `usedPortOut` names the transport actually used, for the status line. */
+    bool send (const dtk::ElkDump& dump, juce::String& errorOut,
+               juce::String* usedPortOut = nullptr)
+    {
         const auto wire = dump.toBytes();
         if (wire.size() < 2) { errorOut = "empty dump"; return false; }
+
+        const juce::ScopedLock sl (rawLock);
+
+        if (rawOut.isOpen())
+        {
+            if (rawOut.write (wire.data(), wire.size(), errorOut))
+            {
+                if (usedPortOut != nullptr)
+                    *usedPortOut = "raw MIDI " + juce::String (rawOut.openedId());
+                return true;
+            }
+            // Fall through to the sequencer rather than giving up outright.
+            errorOut = "raw MIDI failed (" + errorOut + "), retrying on the "
+                       "sequencer port";
+        }
+
+        if (output == nullptr)
+        {
+            if (errorOut.isEmpty()) errorOut = "no MIDI output is open";
+            return false;
+        }
 
         const auto msg = juce::MidiMessage::createSysExMessage (
             wire.data() + 1, (int) wire.size() - 2);
         output->sendMessageNow (msg);
+
+        if (usedPortOut != nullptr)
+            *usedPortOut = "the sequencer port (delivery unconfirmed)";
+
+        // Deliberately not a claim of success: this path cannot know.
         return true;
+    }
+
+    //== raw MIDI (bulk transfers) ============================================
+    bool openRawPort (const std::string& id, juce::String& errorOut)
+        { const juce::ScopedLock sl (rawLock); return rawOut.open (id, errorOut); }
+    void closeRawPort() { const juce::ScopedLock sl (rawLock); rawOut.close(); }
+    bool rawPortOpen() const { const juce::ScopedLock sl (rawLock); return rawOut.isOpen(); }
+    juce::String rawPortId() const
+        { const juce::ScopedLock sl (rawLock); return rawOut.openedId(); }
+
+    /** Opens the rawmidi port that looks like a Digitakt, if there is one. */
+    bool openRawPortAutomatically (juce::String& errorOut)
+    {
+        RawMidiOut::Port p;
+        if (! RawMidiOut::findDigitakt (p))
+        {
+            errorOut = "no raw MIDI port looks like a Digitakt";
+            return false;
+        }
+        const juce::ScopedLock sl (rawLock);
+        return rawOut.open (p.id, errorOut);
     }
 
     //== receiving ============================================================
@@ -115,7 +172,14 @@ private:
     void handleIncomingMidiMessage (juce::MidiInput*,
                                     const juce::MidiMessage& m) override
     {
-        if (! m.isSysEx()) return;
+        if (! m.isSysEx())
+        {
+            // Passed straight through on this thread: deferring to the message
+            // thread would cost the timestamp that makes live playing tight.
+            if (listener != nullptr && m.getChannel() > 0)
+                listener->liveMidiReceived (m);
+            return;
+        }
         appendSysEx (m.getSysExData(), m.getSysExDataSize());
     }
 
@@ -182,6 +246,10 @@ private:
     }
 
     std::unique_ptr<juce::MidiOutput> output;
+    RawMidiOut rawOut;
+    // rawOut is opened on a background thread and used from the
+    // message thread, so every touch of it is guarded.
+    mutable juce::CriticalSection rawLock;
     std::unique_ptr<juce::MidiInput>  input;
     Listener* listener = nullptr;
 

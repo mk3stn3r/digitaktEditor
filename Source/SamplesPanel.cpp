@@ -323,6 +323,13 @@ void SamplesPanel::apiDeviceIdentified (int productId, const juce::String& name)
     setStatus ("Connected to " + name + " (product id " + juce::String (productId) + ")");
 }
 
+void SamplesPanel::apiVersionIdentified (const juce::String& build,
+                                         const juce::String& osVersion)
+{
+    setStatus ("Digitakt OS " + osVersion + " (build " + build + ")");
+    if (listener != nullptr) listener->deviceVersionKnown (build, osVersion);
+}
+
 void SamplesPanel::apiDriveListed (const juce::String& path,
                                    const std::vector<dtk::api::DirEntry>& listed)
 {

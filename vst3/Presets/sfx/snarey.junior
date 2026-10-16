@@ -1,0 +1,237 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<STATE>
+  <PARAMETERS>
+    <PARAM id="Arp Speed" value="0.0" />
+    <PARAM id="Atk Mod 1" value="0.0" />
+    <PARAM id="Atk Mod 2" value="0.0" />
+    <PARAM id="Atk Mod 3" value="0.0" />
+    <PARAM id="Atk Mod 4" value="0.0" />
+    <PARAM id="Attack" value="0.0" />
+    <PARAM id="Cut Mod 1" value="0.0" />
+    <PARAM id="Cut Mod 2" value="0.0" />
+    <PARAM id="Cut Mod 3" value="0.0" />
+    <PARAM id="Cut Mod 4" value="0.0" />
+    <PARAM id="Cutoff" value="52.50002670288086" />
+    <PARAM id="Dec Mod 1" value="0.0" />
+    <PARAM id="Dec Mod 2" value="0.0" />
+    <PARAM id="Dec Mod 3" value="0.0" />
+    <PARAM id="Dec Mod 4" value="0.0" />
+    <PARAM id="Decay" value="33.00006866455078" />
+    <PARAM id="Filter Type" value="0.0" />
+    <PARAM id="Fold" value="0.0" />
+    <PARAM id="Fold Mod 1" value="0.0" />
+    <PARAM id="Fold Mod 2" value="0.0" />
+    <PARAM id="Fold Mod 3" value="0.0" />
+    <PARAM id="Fold Mod 4" value="0.0" />
+    <PARAM id="Gain" value="27.99997329711914" />
+    <PARAM id="Gain Mod 1" value="0.0" />
+    <PARAM id="Gain Mod 2" value="0.0" />
+    <PARAM id="Gain Mod 3" value="0.0" />
+    <PARAM id="Gain Mod 4" value="0.3299996852874756" />
+    <PARAM id="Glide Time" value="0.0" />
+    <PARAM id="Jitter" value="24.0" />
+    <PARAM id="Jitter Mod 1" value="0.0" />
+    <PARAM id="Jitter Mod 2" value="0.0" />
+    <PARAM id="Jitter Mod 3" value="0.0" />
+    <PARAM id="Jitter Mod 4" value="0.0" />
+    <PARAM id="LFSR Mix" value="81.00001525878906" />
+    <PARAM id="LFSR Mode" value="0.0" />
+    <PARAM id="LFSR Rate" value="83.00002288818359" />
+    <PARAM id="Level" value="100.0" />
+    <PARAM id="Level Mod 1" value="0.0" />
+    <PARAM id="Level Mod 2" value="0.0" />
+    <PARAM id="Level Mod 3" value="0.0" />
+    <PARAM id="Level Mod 4" value="0.0" />
+    <PARAM id="Mirror" value="0.0" />
+    <PARAM id="Mix Mod 1" value="0.0" />
+    <PARAM id="Mix Mod 2" value="0.0" />
+    <PARAM id="Mix Mod 3" value="0.0" />
+    <PARAM id="Mix Mod 4" value="0.0" />
+    <PARAM id="Pan Mod 1" value="0.0" />
+    <PARAM id="Pan Mod 2" value="-0.6700000166893005" />
+    <PARAM id="Pan Mod 3" value="0.0" />
+    <PARAM id="Pan Mod 4" value="0.0" />
+    <PARAM id="Rate Mod 1" value="-0.6199983954429626" />
+    <PARAM id="Rate Mod 2" value="0.0" />
+    <PARAM id="Rate Mod 3" value="0.0" />
+    <PARAM id="Rate Mod 4" value="0.0" />
+    <PARAM id="Rel Mod 1" value="0.0" />
+    <PARAM id="Rel Mod 2" value="0.0" />
+    <PARAM id="Rel Mod 3" value="0.0" />
+    <PARAM id="Rel Mod 4" value="0.0" />
+    <PARAM id="Release" value="10.0" />
+    <PARAM id="Res Mod 1" value="0.0" />
+    <PARAM id="Res Mod 2" value="0.0" />
+    <PARAM id="Res Mod 3" value="0.0" />
+    <PARAM id="Res Mod 4" value="0.0" />
+    <PARAM id="Resonance" value="71.99999237060547" />
+    <PARAM id="Scan" value="0.0" />
+    <PARAM id="Scan Mod 1" value="0.0" />
+    <PARAM id="Scan Mod 2" value="0.0" />
+    <PARAM id="Scan Mod 3" value="0.0" />
+    <PARAM id="Scan Mod 4" value="0.0" />
+    <PARAM id="Sus Mod 1" value="0.0" />
+    <PARAM id="Sus Mod 2" value="0.0" />
+    <PARAM id="Sus Mod 3" value="0.0" />
+    <PARAM id="Sus Mod 4" value="0.0" />
+    <PARAM id="Sustain" value="0.0" />
+    <PARAM id="Table 1 End" value="8.0" />
+    <PARAM id="Table 1 Hz" value="97.08582305908203" />
+    <PARAM id="Table 1 Interp Reset" value="0.0" />
+    <PARAM id="Table 1 Interpolation" value="100.0" />
+    <PARAM id="Table 1 MIDI Source" value="1.0" />
+    <PARAM id="Table 1 Mode" value="1.0" />
+    <PARAM id="Table 1 Playback" value="0.0" />
+    <PARAM id="Table 1 Rate" value="0.0" />
+    <PARAM id="Table 1 Rhythm" value="23.0" />
+    <PARAM id="Table 1 Start" value="3.0" />
+    <PARAM id="Table 1 Step 1" value="38.0" />
+    <PARAM id="Table 1 Step 10" value="0.0" />
+    <PARAM id="Table 1 Step 11" value="0.0" />
+    <PARAM id="Table 1 Step 12" value="0.0" />
+    <PARAM id="Table 1 Step 13" value="0.0" />
+    <PARAM id="Table 1 Step 14" value="0.0" />
+    <PARAM id="Table 1 Step 15" value="0.0" />
+    <PARAM id="Table 1 Step 16" value="0.0" />
+    <PARAM id="Table 1 Step 2" value="12.0" />
+    <PARAM id="Table 1 Step 3" value="11.0" />
+    <PARAM id="Table 1 Step 4" value="-1.0" />
+    <PARAM id="Table 1 Step 5" value="-11.0" />
+    <PARAM id="Table 1 Step 6" value="-43.0" />
+    <PARAM id="Table 1 Step 7" value="-33.0" />
+    <PARAM id="Table 1 Step 8" value="0.0" />
+    <PARAM id="Table 1 Step 9" value="0.0" />
+    <PARAM id="Table 2 End" value="3.0" />
+    <PARAM id="Table 2 Hz" value="88.84732055664062" />
+    <PARAM id="Table 2 Interp Reset" value="0.0" />
+    <PARAM id="Table 2 Interpolation" value="0.0" />
+    <PARAM id="Table 2 MIDI Source" value="1.0" />
+    <PARAM id="Table 2 Mode" value="1.0" />
+    <PARAM id="Table 2 Playback" value="0.0" />
+    <PARAM id="Table 2 Rate" value="0.0" />
+    <PARAM id="Table 2 Rhythm" value="20.0" />
+    <PARAM id="Table 2 Start" value="3.0" />
+    <PARAM id="Table 2 Step 1" value="100.0" />
+    <PARAM id="Table 2 Step 10" value="0.0" />
+    <PARAM id="Table 2 Step 11" value="0.0" />
+    <PARAM id="Table 2 Step 12" value="0.0" />
+    <PARAM id="Table 2 Step 13" value="0.0" />
+    <PARAM id="Table 2 Step 14" value="0.0" />
+    <PARAM id="Table 2 Step 15" value="0.0" />
+    <PARAM id="Table 2 Step 16" value="0.0" />
+    <PARAM id="Table 2 Step 2" value="-100.0" />
+    <PARAM id="Table 2 Step 3" value="0.0" />
+    <PARAM id="Table 2 Step 4" value="0.0" />
+    <PARAM id="Table 2 Step 5" value="0.0" />
+    <PARAM id="Table 2 Step 6" value="0.0" />
+    <PARAM id="Table 2 Step 7" value="0.0" />
+    <PARAM id="Table 2 Step 8" value="0.0" />
+    <PARAM id="Table 2 Step 9" value="0.0" />
+    <PARAM id="Table 3 End" value="4.0" />
+    <PARAM id="Table 3 Hz" value="19.99999809265137" />
+    <PARAM id="Table 3 Interp Reset" value="0.0" />
+    <PARAM id="Table 3 Interpolation" value="0.0" />
+    <PARAM id="Table 3 MIDI Source" value="1.0" />
+    <PARAM id="Table 3 Mode" value="1.0" />
+    <PARAM id="Table 3 Playback" value="0.0" />
+    <PARAM id="Table 3 Rate" value="1.0" />
+    <PARAM id="Table 3 Rhythm" value="26.0" />
+    <PARAM id="Table 3 Start" value="1.0" />
+    <PARAM id="Table 3 Step 1" value="18.0" />
+    <PARAM id="Table 3 Step 10" value="0.0" />
+    <PARAM id="Table 3 Step 11" value="0.0" />
+    <PARAM id="Table 3 Step 12" value="0.0" />
+    <PARAM id="Table 3 Step 13" value="0.0" />
+    <PARAM id="Table 3 Step 14" value="0.0" />
+    <PARAM id="Table 3 Step 15" value="0.0" />
+    <PARAM id="Table 3 Step 16" value="0.0" />
+    <PARAM id="Table 3 Step 2" value="15.0" />
+    <PARAM id="Table 3 Step 3" value="12.0" />
+    <PARAM id="Table 3 Step 4" value="12.0" />
+    <PARAM id="Table 3 Step 5" value="0.0" />
+    <PARAM id="Table 3 Step 6" value="0.0" />
+    <PARAM id="Table 3 Step 7" value="0.0" />
+    <PARAM id="Table 3 Step 8" value="0.0" />
+    <PARAM id="Table 3 Step 9" value="0.0" />
+    <PARAM id="Table 4 End" value="3.0" />
+    <PARAM id="Table 4 Hz" value="19.99999809265137" />
+    <PARAM id="Table 4 Interp Reset" value="0.0" />
+    <PARAM id="Table 4 Interpolation" value="0.0" />
+    <PARAM id="Table 4 MIDI Source" value="1.0" />
+    <PARAM id="Table 4 Mode" value="1.0" />
+    <PARAM id="Table 4 Playback" value="0.0" />
+    <PARAM id="Table 4 Rate" value="1.0" />
+    <PARAM id="Table 4 Rhythm" value="20.0" />
+    <PARAM id="Table 4 Start" value="1.0" />
+    <PARAM id="Table 4 Step 1" value="0.0" />
+    <PARAM id="Table 4 Step 10" value="0.0" />
+    <PARAM id="Table 4 Step 11" value="0.0" />
+    <PARAM id="Table 4 Step 12" value="0.0" />
+    <PARAM id="Table 4 Step 13" value="0.0" />
+    <PARAM id="Table 4 Step 14" value="0.0" />
+    <PARAM id="Table 4 Step 15" value="0.0" />
+    <PARAM id="Table 4 Step 16" value="0.0" />
+    <PARAM id="Table 4 Step 2" value="-38.0" />
+    <PARAM id="Table 4 Step 3" value="0.0" />
+    <PARAM id="Table 4 Step 4" value="0.0" />
+    <PARAM id="Table 4 Step 5" value="0.0" />
+    <PARAM id="Table 4 Step 6" value="0.0" />
+    <PARAM id="Table 4 Step 7" value="0.0" />
+    <PARAM id="Table 4 Step 8" value="0.0" />
+    <PARAM id="Table 4 Step 9" value="0.0" />
+    <PARAM id="Tune" value="0.0" />
+    <PARAM id="Tune Mod 1" value="1.0" />
+    <PARAM id="Tune Mod 2" value="0.0" />
+    <PARAM id="Tune Mod 3" value="0.7200002670288086" />
+    <PARAM id="Tune Mod 4" value="0.0" />
+    <PARAM id="Voice Count" value="2.0" />
+    <PARAM id="Width" value="100.0" />
+    <PARAM id="Width Mod 1" value="0.0" />
+    <PARAM id="Width Mod 2" value="0.0" />
+    <PARAM id="Width Mod 3" value="0.0" />
+    <PARAM id="Width Mod 4" value="0.0" />
+    <PARAM id="Window" value="0.0" />
+    <PARAM id="Wrap" value="0.0" />
+    <PARAM id="Wrap Mod 1" value="0.0" />
+    <PARAM id="Wrap Mod 2" value="0.0" />
+    <PARAM id="Wrap Mod 3" value="0.0" />
+    <PARAM id="Wrap Mod 4" value="0.0" />
+    <PARAM id="w0" value="15.0" />
+    <PARAM id="w1" value="15.0" />
+    <PARAM id="w10" value="8.0" />
+    <PARAM id="w11" value="5.0" />
+    <PARAM id="w12" value="2.0" />
+    <PARAM id="w13" value="0.0" />
+    <PARAM id="w14" value="0.0" />
+    <PARAM id="w15" value="0.0" />
+    <PARAM id="w16" value="0.0" />
+    <PARAM id="w17" value="0.0" />
+    <PARAM id="w18" value="0.0" />
+    <PARAM id="w19" value="2.0" />
+    <PARAM id="w2" value="15.0" />
+    <PARAM id="w20" value="4.0" />
+    <PARAM id="w21" value="5.0" />
+    <PARAM id="w22" value="7.0" />
+    <PARAM id="w23" value="8.0" />
+    <PARAM id="w24" value="10.0" />
+    <PARAM id="w25" value="11.0" />
+    <PARAM id="w26" value="13.0" />
+    <PARAM id="w27" value="14.0" />
+    <PARAM id="w28" value="15.0" />
+    <PARAM id="w29" value="15.0" />
+    <PARAM id="w3" value="15.0" />
+    <PARAM id="w30" value="15.0" />
+    <PARAM id="w31" value="15.0" />
+    <PARAM id="w4" value="15.0" />
+    <PARAM id="w5" value="13.0" />
+    <PARAM id="w6" value="15.0" />
+    <PARAM id="w7" value="15.0" />
+    <PARAM id="w8" value="12.0" />
+    <PARAM id="w9" value="10.0" />
+    <PARAM id="Unison" value="0.0" />
+    <PARAM id="Unison Width" value="0.0" />
+    <PARAM id="LFSR Keytrack" value="0.0" />
+  <PARAM id="LFSR Pan Mod 1" value="0.0" /><PARAM id="LFSR Pan Mod 2" value="0.0" /><PARAM id="LFSR Pan Mod 3" value="0.0" /><PARAM id="LFSR Pan Mod 4" value="0.0" /></PARAMETERS>
+  <PROPERTIES plugin_version="0.0" uiscale="1.0" ui_scale_set="0.0" />
+  <PRESET PRESET_NAME="snarey" />
+</STATE>

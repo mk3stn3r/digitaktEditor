@@ -12,6 +12,8 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include "DumpRequester.h"
+#include "InstrumentsPanel.h"
+#include "PluginRack.h"
 #include "PoolPanel.h"
 #include "RemotePanel.h"
 #include "SamplePool.h"
@@ -25,6 +27,7 @@ class MainComponent : public juce::Component,
                       private DumpRequester::Listener,
                       private PoolPanel::Listener,
                       private RemotePanel::Listener,
+                      private InstrumentsPanel::Listener,
                       private juce::Timer
 {
 public:
@@ -57,17 +60,24 @@ private:
 
     void assignSampleToSlot (const dtk::api::DirEntry&, int slot) override;
     void statusMessage (const juce::String&, bool isError) override;
+    void deviceVersionKnown (const juce::String& build,
+                             const juce::String& osVersion) override;
 
     void dumpReceived (const dtk::ElkDump&) override;
     void receiveProgress (int bytes) override;
     void midiError (const juce::String&) override;
     void rawSysExReceived (const dtk::Bytes&) override;
+    void liveMidiReceived (const juce::MidiMessage&) override;
 
     void dumpsArriving (int count, const juce::String& latest) override;
     void dumpsComplete (std::vector<dtk::ElkDump>) override;
     void dumpsFailed (const juce::String& why) override;
 
     void poolChanged() override;
+    void instrumentsChanged() override;
+    void externalMidiChanged (bool enabled, int baseChannel) override;
+    void pluginAudioChanged (bool) override;
+    void sampleAudioChanged (bool) override;
 
     void remoteConfigChanged (SequencerEngine::RemoteConfig) override;
     void autoSendChanged (bool) override;
@@ -84,6 +94,8 @@ private:
     void refreshHeaderFields();
     void refreshInspector();
     void refreshMidiPorts();
+    void refreshAudioOutputName();
+    void openRawPortInBackground();
     void setStatus (const juce::String&, bool isError = false);
     void markDirty();
     dtk::ElkDump* activeDump();
@@ -103,10 +115,15 @@ private:
     // Offline playback: the app is a working sample sequencer with no
     // instrument attached.
     SamplePool pool;
-    SequencerEngine engine { pool };
+    PluginRack rack;
+    SequencerEngine engine { pool, rack };
     juce::AudioDeviceManager audioDevices;
     bool audioReady = false;
     juce::String audioStartupError;
+
+    // Storage version the connected instrument writes, once known.
+    int deviceStorageVersion = dtk::latestDT1PatternVersion;
+    juce::String deviceOsVersion;
 
     static constexpr int portScanTicks = 60;   // ~2 s at a 33 ms tick
     int portScanCountdown = 1;
@@ -124,6 +141,9 @@ private:
         }
     };
     OutputSink midiSink;
+
+    // Set while the rawmidi probe is running on a worker thread.
+    std::atomic<bool> rawProbeRunning { false };
 
     // Auto-send debounce: upload only once the user stops editing.
     static constexpr int autoSendTicks = 60;   // ~2 s
@@ -161,6 +181,7 @@ private:
     SamplesPanel samplesPanel;
     PoolPanel poolPanel { pool, engine };
     RemotePanel remotePanel;
+    InstrumentsPanel instrumentsPanel { rack };
     juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
 
     juce::Label inspectorLabel;

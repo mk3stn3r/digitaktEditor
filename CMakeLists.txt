@@ -45,19 +45,34 @@ target_sources(DigitaktPatternEditor PRIVATE
     Source/SequencerEngine.cpp
     Source/PoolPanel.cpp
     Source/RemotePanel.cpp
+    Source/RawMidiOut.cpp
+    Source/PluginRack.cpp
+    Source/InstrumentsPanel.cpp
+    Source/Log.cpp
     Source/BlankData.cpp)
 
 target_compile_definitions(DigitaktPatternEditor PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    JUCE_PLUGINHOST_VST3=1
+    JUCE_PLUGINHOST_LV2=1
     JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:DigitaktPatternEditor,JUCE_PRODUCT_NAME>"
     JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:DigitaktPatternEditor,JUCE_VERSION>")
+
+# Export symbols and keep frame pointers so the crash handler's backtrace
+# names functions instead of printing bare addresses. Costs nothing measurable
+# and is the difference between a usable crash report and a useless one.
+if(UNIX AND NOT APPLE)
+    target_link_options(DigitaktPatternEditor PRIVATE -rdynamic)
+    target_compile_options(DigitaktPatternEditor PRIVATE -fno-omit-frame-pointer)
+endif()
 
 target_link_libraries(DigitaktPatternEditor PRIVATE
     juce::juce_gui_basics
     juce::juce_audio_basics
     juce::juce_audio_devices
     juce::juce_audio_formats
+    juce::juce_audio_processors
     juce::juce_audio_utils
     PUBLIC
     juce::juce_recommended_config_flags
@@ -91,6 +106,7 @@ target_compile_definitions(TestSampleImport PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
 target_link_libraries(TestSampleImport PRIVATE
     juce::juce_audio_formats
+    juce::juce_audio_processors
     juce::juce_audio_utils
     juce::juce_recommended_config_flags)
 
@@ -100,6 +116,8 @@ juce_add_console_app(TestEngine PRODUCT_NAME "TestEngine")
 target_sources(TestEngine PRIVATE
     Tests/TestEngine.cpp
     Source/SequencerEngine.cpp
+    Source/PluginRack.cpp
+    Source/Log.cpp
     Source/SamplePool.cpp
     Source/SampleImport.cpp
     Source/ElektronApi.cpp
@@ -107,10 +125,47 @@ target_sources(TestEngine PRIVATE
     Source/BlankData.cpp)
 target_include_directories(TestEngine PRIVATE Source)
 target_compile_definitions(TestEngine PRIVATE
-    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
+    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1
+    JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_LV2=1)
 target_link_libraries(TestEngine PRIVATE
     juce::juce_audio_devices
     juce::juce_audio_formats
+    juce::juce_audio_processors
+    juce::juce_recommended_config_flags)
+
+# A GUI-free sender, for isolating transfer problems on real hardware.
+# Built through JUCE's own CMake API so it works the same whether JUCE came
+# from -DJUCE_PATH or was fetched automatically.
+juce_add_console_app(dtk-send PRODUCT_NAME "dtk-send")
+target_sources(dtk-send PRIVATE
+    Tools/dtk-send.cpp
+    Source/RawMidiOut.cpp
+    Source/DigitaktCore.cpp
+    Source/BlankData.cpp)
+target_include_directories(dtk-send PRIVATE Source)
+target_compile_definitions(dtk-send PRIVATE
+    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
+target_link_libraries(dtk-send PRIVATE
+    juce::juce_core
+    juce::juce_recommended_config_flags)
+
+# RawMidiOut talks to ALSA directly; juce_core does not pull it in.
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ALSA REQUIRED alsa)
+    target_link_libraries(dtk-send PRIVATE ${ALSA_LIBRARIES})
+    target_include_directories(dtk-send PRIVATE ${ALSA_INCLUDE_DIRS})
+    target_link_directories(dtk-send PRIVATE ${ALSA_LIBRARY_DIRS})
+endif()
+
+juce_add_console_app(TestRack PRODUCT_NAME "TestRack")
+target_sources(TestRack PRIVATE Tests/TestRack.cpp Source/PluginRack.cpp Source/Log.cpp)
+target_include_directories(TestRack PRIVATE Source)
+target_compile_definitions(TestRack PRIVATE
+    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1
+    JUCE_PLUGINHOST_VST3=1 JUCE_PLUGINHOST_LV2=1)
+target_link_libraries(TestRack PRIVATE
+    juce::juce_audio_processors
     juce::juce_recommended_config_flags)
 
 enable_testing()
@@ -118,3 +173,4 @@ add_test(NAME core COMMAND TestCore)
 add_test(NAME api COMMAND TestApi)
 add_test(NAME sample_import COMMAND TestSampleImport)
 add_test(NAME engine COMMAND TestEngine)
+add_test(NAME rack COMMAND TestRack)

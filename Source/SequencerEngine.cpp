@@ -18,10 +18,13 @@ void SequencerEngine::updateFromPattern (const dtk::PatternKit& pk)
                                       : 0,
                                   maxSteps);
 
-    for (int t = 0; t < numAudioTracks; ++t)
+    for (int t = 0; t < numTracks; ++t)
     {
-        const bool haveTrack = t < (int) pk.pattern.tracks.size() && pk.isAudioTrack (t);
-        const int trackSlot = (haveTrack && t < (int) pk.kit.sounds.size())
+        // Audio tracks play the sample pool; MIDI tracks feed the plugin rack.
+        // Both need their step data, so neither is skipped here.
+        const bool haveTrack = t < (int) pk.pattern.tracks.size();
+        const bool audio = haveTrack && pk.isAudioTrack (t);
+        const int trackSlot = (audio && t < (int) pk.kit.sounds.size())
                                   ? pk.kit.sounds[(size_t) t].sampleSlot : 0;
 
         for (int i = 0; i < maxSteps; ++i)
@@ -36,8 +39,11 @@ void SequencerEngine::updateFromPattern (const dtk::PatternKit& pk)
                     d.note     = tr.lock ("note", i).value_or (tr.defaultNote());
                     d.velocity = tr.lock ("velocity", i).value_or (tr.defaultVelocity());
                     d.length   = tr.lock ("length", i).value_or (0);
-                    // A sample p-lock overrides the track's kit sample.
-                    d.slot     = dtk::SampleLockLane::get (pk, t, i).value_or (trackSlot);
+                    // A sample p-lock overrides the track's kit sample. MIDI
+                    // tracks have no sample, so the slot stays 0 for them.
+                    d.slot     = audio
+                        ? dtk::SampleLockLane::get (pk, t, i).value_or (trackSlot)
+                        : 0;
                 }
             }
             s.steps[t][i] = d;
@@ -60,6 +66,26 @@ void SequencerEngine::stop()
 {
     playing.store (false);
     pendingStop.store (true);
+}
+
+void SequencerEngine::handleExternalMidi (const juce::MidiMessage& m)
+{
+    if (! externalMidi.load()) return;
+    externalCollector.addMessageToQueue (m);
+}
+
+void SequencerEngine::setExternalMidiInput (bool enabled, int baseChannel)
+{
+    externalBase.store (juce::jlimit (1, 16, baseChannel));
+    externalMidi.store (enabled);
+    if (! enabled)
+        for (auto& n : externalRouted) n.store (0);
+}
+
+int SequencerEngine::externalMessagesRouted (int slot) const
+{
+    if (slot < 0 || slot >= numMidiTracks) return 0;
+    return externalRouted[slot].load();
 }
 
 void SequencerEngine::setMidiSink (MidiSink* s)
@@ -128,6 +154,34 @@ void SequencerEngine::emitNoteOff (int track, int offset)
 void SequencerEngine::allNotesOff (int offset)
 {
     for (int t = 0; t < numAudioTracks; ++t) emitNoteOff (t, offset);
+    for (int t = 0; t < numMidiTracks; ++t) emitPluginNoteOff (t, offset);
+}
+
+void SequencerEngine::emitPluginNoteOn (int midiTrack, const StepData& d,
+                                        double samplesPerStep, int offset)
+{
+    if (midiTrack < 0 || midiTrack >= numMidiTracks) return;
+
+    // The Digitakt's MIDI tracks are sequenced one note per step here, so a
+    // retrig releases the held note before starting the next.
+    if (pluginNote[midiTrack] >= 0) emitPluginNoteOff (midiTrack, offset);
+
+    const int note = juce::jlimit (0, 127, d.note);
+    rack.addNoteOn (midiTrack, note, d.velocity, offset);
+
+    pluginNote[midiTrack] = note;
+    pluginGateLeft[midiTrack] = d.length > 0 ? d.length * samplesPerStep
+                                             : samplesPerStep;
+}
+
+void SequencerEngine::emitPluginNoteOff (int midiTrack, int offset)
+{
+    if (midiTrack < 0 || midiTrack >= numMidiTracks) return;
+    if (pluginNote[midiTrack] < 0) return;
+
+    rack.addNoteOff (midiTrack, pluginNote[midiTrack], offset);
+    pluginNote[midiTrack] = -1;
+    pluginGateLeft[midiTrack] = -1.0;
 }
 
 void SequencerEngine::triggerAudition (int slot, int note, float velocity)
@@ -150,12 +204,21 @@ void SequencerEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
         activeMidiNote[t] = -1;
         midiGateLeft[t] = -1.0;
     }
+    for (int t = 0; t < numMidiTracks; ++t)
+    {
+        pluginNote[t] = -1;
+        pluginGateLeft[t] = -1.0;
+    }
+    rack.prepare (sampleRate, device != nullptr
+                                  ? device->getCurrentBufferSizeSamples() : 512);
+    externalCollector.reset (sampleRate);
 }
 
 void SequencerEngine::audioDeviceStopped()
 {
     playing.store (false);
     pendingStop.store (true);
+    rack.releaseResources();
     for (auto& v : voices) v.reset();
     auditionVoice.reset();
 }
@@ -177,6 +240,13 @@ void SequencerEngine::fireStep (int step, int sampleOffset)
 {
     const auto& s = snapshots[liveSnapshot.load()];
     const double samplesPerStep = sampleRate * 60.0 / juce::jmax (30.0, s.tempo) / 4.0;
+
+    for (int t = numAudioTracks; t < numTracks; ++t)
+    {
+        const auto& d = s.steps[t][step];
+        if (d.trig) emitPluginNoteOn (t - numAudioTracks, d, samplesPerStep,
+                                      sampleOffset);
+    }
 
     for (int t = 0; t < numAudioTracks; ++t)
     {
@@ -241,6 +311,31 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
 
     const auto cfg = currentRemote();
     midiOut.clear();
+    rack.beginBlock();
+
+    // Live MIDI from the instrument, dispatched to the hosted plugins by
+    // channel. This runs whether or not the transport is playing, so the
+    // Digitakt's MIDI tracks can drive the plugins on their own.
+    if (externalMidi.load())
+    {
+        juce::MidiBuffer incoming;
+        externalCollector.removeNextBlockOfMessages (incoming, numSamples);
+
+        const int base = externalBase.load();
+        for (const auto meta : incoming)
+        {
+            const auto m = meta.getMessage();
+            const int channel = m.getChannel();
+            if (channel <= 0) continue;                  // not a channel message
+
+            const int slot = channel - base;
+            if (slot < 0 || slot >= numMidiTracks) continue;
+
+            rack.addMessage (slot, m, juce::jlimit (0, numSamples - 1,
+                                                    meta.samplePosition));
+            externalRouted[slot].fetch_add (1);
+        }
+    }
 
     if (pendingStart.exchange (false) && cfg.enabled && cfg.sendTransport)
     {
@@ -307,8 +402,14 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
             }
         };
 
-        for (auto& v : voices) renderVoice (v);
-        renderVoice (auditionVoice);
+        // Muting the sample tracks takes effect at once, including on voices
+        // already sounding. Letting them ring would put a tail into whatever
+        // the Digitakt is recording.
+        if (localAudio.load())
+        {
+            for (auto& v : voices) renderVoice (v);
+            renderVoice (auditionVoice);
+        }
 
         // MIDI clock runs on its own subdivision of the step grid.
         if (playing.load() && cfg.enabled && cfg.sendClock)
@@ -335,6 +436,15 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
                 emitNoteOff (t, juce::jmin (numSamples - 1, offset + block - 1));
         }
 
+        // Same for the notes held by the hosted instruments.
+        for (int t = 0; t < numMidiTracks; ++t)
+        {
+            if (pluginNote[t] < 0 || pluginGateLeft[t] < 0.0) continue;
+            pluginGateLeft[t] -= (double) block;
+            if (pluginGateLeft[t] <= 0.0)
+                emitPluginNoteOff (t, juce::jmin (numSamples - 1, offset + block - 1));
+        }
+
         if (playing.load())
         {
             samplesUntilNextStep -= (double) block;
@@ -346,6 +456,11 @@ void SequencerEngine::audioDeviceIOCallbackWithContext (
         }
         offset += block;
     }
+
+    // Plugins run once for the whole callback, after every note event for the
+    // block has been queued at its correct sample offset.
+    rack.renderAndMix (outputChannelData, numOutputChannels, numSamples,
+                       pluginAudio.load() ? masterGain : 0.0f);
 
     if (! midiOut.isEmpty())
     {

@@ -21,6 +21,9 @@ public:
         /** The user asked to bind a +Drive file to a project sample slot. */
         virtual void assignSampleToSlot (const dtk::api::DirEntry&, int slot) = 0;
         virtual void statusMessage (const juce::String&, bool isError) = 0;
+        /** The instrument reported its OS; used to pick the storage version. */
+        virtual void deviceVersionKnown (const juce::String& build,
+                                         const juce::String& osVersion) = 0;
     };
 
     SamplesPanel();
@@ -42,6 +45,8 @@ public:
     void fileDragExit (const juce::StringArray&) override;
 
     void refresh();
+    /** Asks the instrument which OS it runs. */
+    void identifyDevice() { api.requestVersion(); }
 
 private:
     int  getNumRows() override;
@@ -49,6 +54,8 @@ private:
     void listBoxItemDoubleClicked (int row, const juce::MouseEvent&) override;
 
     void apiDeviceIdentified (int productId, const juce::String& name) override;
+    void apiVersionIdentified (const juce::String& build,
+                               const juce::String& osVersion) override;
     void apiDriveListed (const juce::String& path,
                          const std::vector<dtk::api::DirEntry>&) override;
     void apiUploadProgress (const juce::String& name, double fraction,

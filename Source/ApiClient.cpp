@@ -55,6 +55,15 @@ void ApiClient::identifyDevice()
     sendRequest (dtk::api::request::deviceInfo());
 }
 
+void ApiClient::requestVersion()
+{
+    if (busy) return;
+    if (output == nullptr) { failWith ("No MIDI output is open."); return; }
+    busy = true;
+    op = Op::version;
+    sendRequest (dtk::api::request::versionInfo());
+}
+
 void ApiClient::listDirectory (const juce::String& path)
 {
     if (busy) return;
@@ -209,6 +218,19 @@ void ApiClient::handleIncomingSysEx (const dtk::Bytes& sysex)
             if (listener != nullptr)
                 listener->apiDeviceIdentified (msg.productId, juce::String (msg.text));
             return;
+
+        case Op::version:
+        {
+            finishOperation();
+            if (listener == nullptr) return;
+
+            // The response carries a build and a version string. Rather than
+            // trust their order, pick whichever looks like a 4-digit build.
+            const juce::String a (msg.text), b (msg.text2);
+            const bool aIsBuild = a.containsOnly ("0123456789") && a.length() == 4;
+            listener->apiVersionIdentified (aIsBuild ? a : b, aIsBuild ? b : a);
+            return;
+        }
 
         case Op::list:
             finishOperation();
